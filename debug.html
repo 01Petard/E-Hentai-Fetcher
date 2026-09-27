@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#f5f5f1"/>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <title>响应调试 · Gallery Lens</title>
+  <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+      * { box-sizing: border-box; }
+      :root {
+          color-scheme: light;
+          font: 16px/1.55 system-ui, sans-serif;
+          color: #20252b;
+          background: #f3f5f7;
+      }
+
+      body {
+          max-width: 1120px;
+          margin: 40px auto;
+          padding: 0 20px;
+      }
+
+      main {
+          padding: 28px;
+          background: white;
+          border: 1px solid #dfe3e8;
+          border-radius: 12px;
+          box-shadow: 0 8px 28px #16202a0b;
+      }
+
+      h1 {
+          margin: 0 0 8px;
+          font-size: 1.55rem;
+      }
+
+      p {
+          color: #59636e;
+      }
+
+      label {
+          display: block;
+          margin: 20px 0 6px;
+          font-weight: 650;
+      }
+
+      .row {
+          display: flex;
+          gap: 10px;
+      }
+
+      input {
+          flex: 1;
+          min-width: 0;
+          padding: 11px 12px;
+          border: 1px solid #cbd2d9;
+          border-radius: 7px;
+          font: inherit;
+      }
+
+      textarea {
+          box-sizing: border-box;
+          width: 100%;
+          min-height: 105px;
+          padding: 11px 12px;
+          border: 1px solid #cbd2d9;
+          border-radius: 7px;
+          font: inherit;
+          resize: vertical;
+      }
+
+      button {
+          padding: 10px 18px;
+          border: 0;
+          border-radius: 7px;
+          color: white;
+          background: #2463eb;
+          font: inherit;
+          font-weight: 650;
+          cursor: pointer;
+      }
+
+      button:disabled {
+          opacity: .6;
+          cursor: wait;
+      }
+
+      #summary {
+          margin-top: 20px;
+          font-weight: 650;
+      }
+
+      .display-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 12px 0 0;
+          font-weight: 500;
+      }
+
+      .display-option input { flex: none; width: 18px; height: 18px; }
+      .option-note { margin: 2px 0 0 26px; color: #59636e; font-size: .875rem; }
+
+      .result-section { margin-top: 24px; }
+
+      .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+      .section-heading h2 { margin: 0; font-size: 1.25rem; }
+      .section-heading span { color: #59636e; font-size: .875rem; }
+
+      pre {
+          min-height: 160px;
+          max-height: 360px;
+          margin: 0;
+          overflow: auto;
+          padding: 16px;
+          border-radius: 8px;
+          background: #111923;
+          color: #e5edf5;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+      }
+
+      .content-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+      .view-switch { display: inline-flex; padding: 3px; border-radius: 8px; background: #e9edf2; }
+      .view-switch button { padding: 6px 14px; border-radius: 6px; background: transparent; color: #394654; font-size: .875rem; }
+      .view-switch button[aria-pressed="true"] { background: #fff; color: #2052bc; box-shadow: 0 1px 4px #16202a25; }
+      .total-count { color: #394654; font-variant-numeric: tabular-nums; }
+      .pagination { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+      .pagination button { padding: 7px 12px; border: 1px solid #cbd2d9; background: #fff; color: #2052bc; font-size: .875rem; }
+      .pagination button:hover:not(:disabled) { background: #e8eefc; }
+      .pagination button:disabled { background: #f3f5f7; color: #8a949f; opacity: 1; cursor: not-allowed; }
+
+      .gallery-list { border-top: 1px solid #dfe3e8; }
+      .gallery-entry { display: grid; grid-template-columns: 170px minmax(0, 1fr); grid-template-areas: "cover meta" "cover title" "cover details" "cover tags"; column-gap: 22px; row-gap: 8px; padding: 22px 0; border-bottom: 1px solid #dfe3e8; min-width: 0; }
+      .entry-cover { grid-area: cover; display: flex; align-items: center; justify-content: center; min-height: 210px; align-self: start; background: #edf0f3; border-radius: 8px; overflow: hidden; color: #59636e; text-decoration: none; }
+      .entry-cover img { display: block; width: 100%; max-height: 240px; object-fit: contain; }
+      .entry-meta, .entry-details { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; color: #59636e; font-size: .875rem; }
+      .entry-meta { grid-area: meta; }
+      .entry-category { padding: 2px 8px; border-radius: 4px; background: #e8eefc; color: #294d9c; font-weight: 650; }
+      .entry-rating { display: inline-block; width: 80px; height: 16px; background: url("https://ehgt.org/g/rt.png") no-repeat; }
+      .gallery-entry h3 { grid-area: title; min-width: 0; margin: 0; font-size: 1.125rem; line-height: 1.45; overflow-wrap: anywhere; }
+      .gallery-entry a { color: #2052bc; text-underline-offset: 3px; }
+      .gallery-entry h3 a { color: #20252b; text-decoration: none; }
+      .gallery-entry h3 a:hover { color: #2052bc; text-decoration: underline; }
+      .entry-details { grid-area: details; }
+      .entry-tags { grid-area: tags; display: grid; align-content: start; gap: 7px; margin-top: 8px; }
+      .tag-group { display: flex; align-items: baseline; gap: 8px; }
+      .tag-group-label { min-width: 72px; color: #59636e; font-size: .875rem; }
+      .tag-values { display: flex; flex-wrap: wrap; gap: 5px; }
+      .tag-values span { padding: 2px 7px; border-radius: 4px; background: #f0f2f5; color: #37424e; font-size: .875rem; }
+      .empty-result { margin: 0; padding: 24px 0; color: #59636e; }
+
+      .gallery-list.thumbnail { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; border-top: 0; }
+      .gallery-list.thumbnail .gallery-entry { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "cover" "meta" "details"; grid-template-rows: minmax(3.5em, auto) 250px auto 1fr; gap: 10px; padding: 12px; border: 1px solid #dfe3e8; border-radius: 10px; }
+      .gallery-list.thumbnail .gallery-entry h3 { font-size: 1rem; max-height: 4.4em; overflow: hidden; }
+      .gallery-list.thumbnail .entry-cover { width: 100%; height: 250px; min-height: 0; }
+      .gallery-list.thumbnail .entry-cover img { max-height: 250px; }
+      .gallery-list.thumbnail .entry-meta { justify-content: space-between; gap: 8px; }
+      .gallery-list.thumbnail .entry-details { align-content: end; gap: 7px 12px; }
+      .gallery-list.thumbnail .entry-tags, .gallery-list.thumbnail .entry-uploader { display: none; }
+      .entry-cover:focus-visible, .entry-content a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #7ea6ff; outline-offset: 2px; }
+
+      .hint {
+          padding: 12px 14px;
+          background: #fff7df;
+          border-radius: 7px;
+          font-size: .875rem;
+      }
+
+      @media (max-width: 560px) {
+          body {
+              margin: 18px auto;
+          }
+
+          main {
+              padding: 18px;
+          }
+
+          .row {
+              flex-direction: column;
+          }
+
+          .gallery-entry { grid-template-columns: 110px minmax(0, 1fr); column-gap: 14px; }
+          .entry-cover { min-height: 150px; }
+          .entry-cover img { max-height: 180px; }
+          .tag-group { display: block; }
+          .tag-group-label { display: block; margin-bottom: 3px; }
+          .gallery-list.thumbnail { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+          .gallery-list.thumbnail .gallery-entry { grid-template-rows: minmax(4.4em, auto) 190px auto 1fr; }
+          .gallery-list.thumbnail .entry-cover { height: 190px; }
+          .gallery-list.thumbnail .entry-cover img { max-height: 190px; }
+      }
+
+      :root { color: #23382d; background: #f5f5f1; scrollbar-color: #afc6b3 #f5f5f1; }
+      ::selection { background: #d5e9da; color: #243d2f; }
+      main { border-color: #e2e8df; border-radius: 16px; box-shadow: 0 12px 34px #25402b0b; }
+      h1 { font-size: 1.9rem; letter-spacing: -.03em; }
+      .section-heading h2 { font-size: 1.4rem; letter-spacing: -.02em; }
+      p, .section-heading span, .option-note, .entry-meta, .entry-details { color: #5c7162; }
+      .hint { background: #edf3ea; color: #486651; border: 1px solid #dce8dc; }
+      .hint a { color: #a45f46; text-underline-offset: 3px; }
+      input[type="checkbox"] { accent-color: #c77459; }
+      input, textarea { border-color: #d3dfd3; color: #23382d; caret-color: #c77459; }
+      input:focus, textarea:focus { border-color: #92b19b; }
+      button { background: #c77459; }
+      button:hover:not(:disabled) { background: #aa5e45; }
+      .view-switch { background: #edf2ec; }
+      .view-switch button { color: #536c5c; }
+      .view-switch button:hover:not(:disabled) { background: #e1ece2; }
+      .view-switch button[aria-pressed="true"] { background: white; color: #35684a; }
+      .pagination button { color: #426c50; border-color: #d7e3d7; background: white; }
+      .pagination button:hover:not(:disabled) { background: #edf4ee; }
+      .pagination button:disabled { background: #f4f6f2; color: #9aad9d; }
+      .entry-category { background: #e5efe8; color: #397151; }
+      .gallery-entry a { color: #a75f46; }
+      .gallery-entry h3 a { color: #23382d; }
+      .gallery-entry h3 a:hover { color: #a75f46; }
+      .tag-values span { background: #edf2ed; color: #49644f; }
+      .entry-cover:focus-visible, .gallery-entry a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #e6a181; outline-offset: 2px; }
+
+      :root { font-family: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif; }
+      body { max-width: none; min-width: 320px; margin: 0; padding: 0; }
+      .debug-shell { min-height: 100vh; display: flex; flex-direction: column; }
+      .site-header { height: 60px; padding: 0 max(24px, calc((100vw - 1260px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid #e3e6e3; background: #fff; box-shadow: 0 1px 0 #ffffffa8; }
+      .brand { display: flex; align-items: center; gap: 11px; }
+      .brand-mark { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding-right: 3px; border-radius: 11px; background: #233d42; color: #fff; font: 25px/1 Georgia, serif; letter-spacing: -.09em; }
+      .brand-mark span { position: absolute; right: 8px; bottom: 5px; color: #f6b27e; font-size: 19px; }
+      .brand strong { display: block; font-size: 16px; letter-spacing: -.04em; line-height: 1.1; }
+      .brand small { display: block; margin-top: 5px; color: #87928f; font-size: 10px; letter-spacing: .14em; }
+      .header-actions { display: flex; align-items: center; gap: 26px; font-size: 13px; font-weight: 600; }
+      .header-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; color: #566966; text-decoration: none; }
+      .header-actions a:hover, .site-footer a:hover { color: #ce7558; }
+      .header-actions .settings-trigger { min-height: 39px; padding: 9px 13px; border: 1px solid #dae2dd; border-radius: 8px; background: #fff; color: #283d3d; gap: 9px; }
+      .header-actions .settings-trigger:hover { border-color: #a9bfb1; background: #f2f6f3; }
+      .settings-dot { width: 7px; height: 7px; border-radius: 50%; background: #c8cec9; }
+      .settings-dot.active { background: #4d9f78; box-shadow: 0 0 0 3px #4d9f7820; }
+      .site-footer { height: 70px; padding: 0 max(24px, calc((100vw - 1260px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid #e2e6df; color: #9aa89d; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
+      .site-footer a { color: inherit; font-size: 11px; letter-spacing: 0; text-decoration: none; }
+      .footer-dot { color: #c77459; }
+      .debug-main { width: min(1260px, 100%); margin: 0 auto; padding: 16px 24px 56px; flex: 1; background: none; border: 0; border-radius: 0; box-shadow: none; }
+      .debug-request-card { padding: 18px 24px; border: 1px solid #dce7dc; border-radius: 14px; background: #e9f0e9; }
+      .debug-request-card h1 { margin: 0 0 3px; font-family: Georgia, 'Noto Sans SC', serif; font-size: 30px; letter-spacing: -.03em; line-height: 1.25; }
+      .debug-request-card > p { margin: 0 0 12px; font-size: 12px; }
+      .debug-request-card .hint { margin-bottom: 14px; padding: 8px 10px; font-size: 11px; }
+      .debug-request-card label:not(.display-option) { margin: 12px 0 5px; font-size: 12px; color: #385745; }
+      .debug-request-card input[type="url"], .debug-request-card textarea { background: #fff; font-size: 13px; }
+      .debug-request-card textarea { min-height: 76px; }
+      .debug-request-card .row button { white-space: nowrap; }
+      .debug-request-card .display-option { margin-top: 10px; font-size: 12px; }
+      .debug-request-card .option-note { font-size: 11px; }
+      #summary { margin-top: 12px; color: #375d47; font-size: 12px; overflow-wrap: anywhere; }
+      .result-section { margin-top: 16px; padding: 18px 24px; border: 1px solid #e2e8df; border-radius: 12px; background: #fff; }
+      .section-heading { align-items: center; flex-wrap: wrap; }
+      .section-heading h2 { font-size: 19px; }
+      .content-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; margin: 0; }
+      .content-toolbar .total-count { grid-column: 1; font-size: 12px; }
+      .content-toolbar .pagination { grid-column: 2; justify-content: center; margin: 0; }
+      .content-toolbar .view-switch { grid-column: 3; justify-self: end; }
+      .gallery-list { margin-top: 12px; }
+      .debug-nav a[aria-current="page"] { color: #2f5b40; }
+      @media (max-width: 600px) {
+          .site-header { height: 56px; padding: 0 12px; gap: 8px; }
+          .brand-mark { width: 35px; height: 35px; font-size: 21px; }
+          .brand strong { font-size: 14px; }
+          .brand small { font-size: 9px; }
+          .header-actions { gap: 8px; font-size: 10px; }
+          .header-actions a { min-height: 34px; font-size: 10px; }
+          .header-actions a svg { display: none; }
+          .header-actions .settings-trigger { min-height: 34px; padding: 6px 7px; gap: 6px; }
+          .site-footer { height: 60px; padding: 0 17px; }
+          .debug-main { padding: 10px 14px 40px; }
+          .debug-request-card, .result-section { padding: 14px; }
+          .debug-request-card h1 { font-size: 23px; }
+          .content-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+          .content-toolbar .total-count { grid-column: 1; grid-row: 1; }
+          .content-toolbar .view-switch { grid-column: 2; grid-row: 1; }
+          .content-toolbar .pagination { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+          .content-toolbar .pagination button { padding: 7px 9px; font-size: 10px; }
+      }
+  </style>
+</head>
+<body>
+<div class="debug-shell">
+  <header class="site-header">
+    <div class="brand" aria-label="Gallery Lens"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></div>
+    <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/">主页</a><a href="/debug" aria-current="page"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5h6v6M19 5l-9 9"/><path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/></svg> 调试页面</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
+  </header>
+<main class="debug-main">
+  <section class="debug-request-card" aria-labelledby="debug-title">
+  <h1 id="debug-title">响应调试</h1>
+  <p>按指定请求头发送 GET，查看完整响应并解析图库。</p>
+  <div class="hint">Cookie 留空时使用本地配置；手动输入仅用于本次请求。</div>
+
+  <label for="url">请求地址</label>
+  <div class="row">
+    <input id="url" type="url" value="https://e-hentai.org/?f_search=AHY"/>
+    <button id="send" type="button">发送 GET</button>
+  </div>
+  <label for="cookie">Cookie 请求头的值（可留空使用本地配置）</label>
+  <textarea id="cookie" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=...; sk=...; event=..." spellcheck="false" autocomplete="off"></textarea>
+  <label class="display-option" for="extended"><input id="extended" type="checkbox" checked/> 请求 Extended 布局（返回 .itg.glte）</label>
+  <p class="option-note">勾选后仅本次请求将显示模式 Cookie 设为 <code>sl=dm_2</code>。</p>
+
+  <div id="summary" role="status" aria-live="polite">尚未发送请求</div>
+  </section>
+  <section class="result-section" aria-labelledby="response-heading">
+    <div class="section-heading"><h2 id="response-heading">原始响应</h2><span id="response-meta"></span></div>
+    <pre id="output" aria-label="响应源码">响应信息会显示在这里。</pre>
+  </section>
+  <section class="result-section" aria-labelledby="gallery-heading">
+    <div class="section-heading"><h2 id="gallery-heading">内容展示</h2><span id="gallery-meta"></span></div>
+    <div class="content-toolbar">
+      <span id="total-count" class="total-count">结果总数：—</span>
+      <nav class="pagination" aria-label="上方分页"><button type="button" data-page="first" disabled>首页</button><button type="button" data-page="prev" disabled>上一页</button><button type="button" data-page="next" disabled>下一页</button><button type="button" data-page="last" disabled>末页</button></nav>
+      <div class="view-switch" role="group" aria-label="内容展示形式">
+        <button type="button" data-view="extended" aria-pressed="true">扩展</button>
+        <button type="button" data-view="thumbnail" aria-pressed="false">缩略图</button>
+      </div>
+    </div>
+    <div id="gallery" class="gallery-list" aria-live="polite"><p class="empty-result">请求完成后展示 .itg.glte 表格的内容。</p></div>
+  </section>
+</main>
+<footer class="site-footer"><span>GALLERY LENS <span class="footer-dot">·</span> LOCAL TOOL</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">作者主页 ↗</a></footer>
+</div>
+<template id="gallery-template">
+  <article class="gallery-entry">
+    <a class="entry-cover" target="_blank" rel="noopener noreferrer"></a>
+    <div class="entry-meta"><span class="entry-category"></span><span class="entry-rating" role="img" aria-label="站点星级"></span></div>
+    <h3><a class="entry-title" target="_blank" rel="noopener noreferrer"></a></h3>
+    <div class="entry-details"><time class="entry-date"></time><span class="entry-pages"></span><a class="entry-uploader" target="_blank" rel="noopener noreferrer"></a><a class="entry-torrent" target="_blank" rel="noopener noreferrer">种子</a></div>
+    <div class="entry-tags"></div>
+  </article>
+</template>
+<script>
+    const urlInput = document.querySelector("#url");
+    const cookieInput = document.querySelector("#cookie");
+    const sendButton = document.querySelector("#send");
+    const extendedInput = document.querySelector("#extended");
+    const summary = document.querySelector("#summary");
+    const output = document.querySelector("#output");
+    const responseMeta = document.querySelector("#response-meta");
+    const galleryMeta = document.querySelector("#gallery-meta");
+    const gallery = document.querySelector("#gallery");
+    const galleryTemplate = document.querySelector("#gallery-template");
+    const totalCount = document.querySelector("#total-count");
+    const paginationButtons = [...document.querySelectorAll(".pagination button")];
+
+    fetch('/api/config').then(response => response.json()).then(data => {
+        document.querySelector('.settings-dot').classList.toggle('active', Boolean(data.configured));
+    }).catch(() => {});
+
+    for (const button of document.querySelectorAll(".view-switch button")) {
+        button.addEventListener("click", () => {
+            gallery.classList.toggle("thumbnail", button.dataset.view === "thumbnail");
+            for (const option of document.querySelectorAll(".view-switch button")) {
+                option.setAttribute("aria-pressed", String(option === button));
+            }
+        });
+    }
+
+    for (const button of paginationButtons) {
+        button.addEventListener("click", () => {
+            if (!button.dataset.url) return;
+            document.querySelector("#gallery-heading").scrollIntoView({block: "start"});
+            loadPage(button.dataset.url);
+        });
+    }
+
+    function safeUrl(value, allowedHosts, baseUrl) {
+        if (!value) return null;
+        try {
+            const parsed = new URL(value, baseUrl);
+            return parsed.protocol === "https:" && allowedHosts.includes(parsed.hostname) ? parsed.href : null;
+        } catch {
+            return null;
+        }
+    }
+
+    if (location.protocol === "file:") {
+        summary.textContent = "请通过本地服务打开页面";
+        output.textContent = "在当前目录运行 npm run dev，然后访问 http://127.0.0.1:8765/debug。直接打开 HTML 文件无法访问 /fetch 接口。";
+        gallery.innerHTML = "<p class=\"empty-result\">请先通过本地服务打开页面。</p>";
+        sendButton.disabled = true;
+    }
+
+    sendButton.addEventListener("click", () => loadPage(urlInput.value.trim()));
+
+    async function loadPage(url) {
+        const cookie = cookieInput.value.trim();
+        urlInput.value = url;
+        sendButton.disabled = true;
+        for (const button of paginationButtons) {
+            button.disabled = true;
+            delete button.dataset.url;
+        }
+        summary.textContent = "请求中…";
+        output.textContent = "";
+        responseMeta.textContent = "";
+        galleryMeta.textContent = "";
+        totalCount.textContent = "结果总数：—";
+        gallery.replaceChildren();
+        try {
+            const response = await fetch("/fetch", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({url, cookie, userAgent: navigator.userAgent, extended: extendedInput.checked}),
+            });
+            if (!response.headers.get("Content-Type")?.includes("application/json")) {
+                throw new Error(`本地 /fetch 返回了 HTTP ${response.status}，但响应不是 JSON。请通过 npm run dev 启动服务。`);
+            }
+            const result = await response.json();
+            if (result.error) throw new Error(result.error);
+            const headers = Object.entries(result.headers).map(([name, value]) => `${name}: ${value}`).join("\n");
+            summary.textContent = `HTTP ${result.status} ${result.reason} · ${url}`;
+            output.textContent = `响应头:\n${headers || "（无响应头）"}\n\n响应正文（${result.body.length.toLocaleString()} 个字符）:\n${result.body}`;
+            responseMeta.textContent = `${result.body.length.toLocaleString()} 个字符`;
+
+            const parsed = new DOMParser().parseFromString(result.body, "text/html");
+            const searchText = parsed.querySelector(".searchtext p")?.textContent || "";
+            const totalMatch = searchText.match(/\bFound\s+(about\s+)?([\d,]+)\s+results?\b/i);
+            if (totalMatch) {
+                const total = Number(totalMatch[2].replaceAll(",", ""));
+                totalCount.textContent = `${totalMatch[1] ? "约 " : ""}${total.toLocaleString()} 条结果`;
+            }
+            const sourceNav = parsed.querySelector(".searchnav");
+            for (const button of paginationButtons) {
+                const sourceLink = sourceNav?.querySelector(`[id$="${button.dataset.page}"]`);
+                const targetUrl = sourceLink?.tagName === "A"
+                    ? safeUrl(sourceLink.getAttribute("href"), ["e-hentai.org"], url)
+                    : null;
+                button.disabled = !targetUrl;
+                if (targetUrl) button.dataset.url = targetUrl;
+            }
+            const table = parsed.querySelector("table.itg.glte");
+            if (!table) {
+                const otherTable = parsed.querySelector("table.itg");
+                galleryMeta.textContent = "未找到目标表格";
+                const message = document.createElement("p");
+                message.className = "empty-result";
+                message.textContent = otherTable
+                    ? `响应包含 ${otherTable.className}，但没有 .itg.glte。请勾选 Extended 布局后重试。`
+                    : "响应中没有 .itg.glte 表格；请检查状态码和原始响应内容。";
+                gallery.append(message);
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            let count = 0;
+            for (const row of table.rows) {
+                if (row.cells.length < 2) continue;
+                const coverCell = row.cells[0];
+                const detailCell = row.cells[1];
+                const titleNode = detailCell.querySelector(".gl4e .glink");
+                if (!titleNode) continue;
+                const item = galleryTemplate.content.firstElementChild.cloneNode(true);
+                const galleryUrl = safeUrl(titleNode.closest("a")?.getAttribute("href"), ["e-hentai.org"], url);
+                const titleLink = item.querySelector(".entry-title");
+                titleLink.textContent = titleNode.textContent.trim();
+                if (galleryUrl) titleLink.href = galleryUrl;
+                else titleLink.removeAttribute("href");
+
+                const cover = item.querySelector(".entry-cover");
+                const image = coverCell.querySelector("img");
+                const imageUrl = safeUrl(image?.getAttribute("data-src") || image?.getAttribute("src"), ["ehgt.org", "e-hentai.org"], url);
+                if (galleryUrl) cover.href = galleryUrl;
+                else cover.removeAttribute("href");
+                if (imageUrl) {
+                    const renderedImage = document.createElement("img");
+                    renderedImage.src = imageUrl;
+                    renderedImage.alt = titleLink.textContent;
+                    renderedImage.loading = "lazy";
+                    renderedImage.decoding = "async";
+                    cover.append(renderedImage);
+                } else {
+                    cover.textContent = "无封面";
+                }
+
+                const metadata = detailCell.querySelector(".gl3e");
+                item.querySelector(".entry-category").textContent = metadata?.querySelector(".cn")?.textContent.trim() || "未分类";
+                const rating = item.querySelector(".entry-rating");
+                const sourceRating = metadata?.querySelector(".ir");
+                const ratingPosition = sourceRating?.style.backgroundPosition || "";
+                if (/^-?\d+px\s+-?\d+px$/.test(ratingPosition)) {
+                    rating.style.backgroundPosition = ratingPosition;
+                    const ratingSprites = {irr: "rtr.png", irb: "rtb.png", irg: "rtg.png"};
+                    for (const [className, sprite] of Object.entries(ratingSprites)) {
+                        if (sourceRating.classList.contains(className)) {
+                            rating.style.backgroundImage = `url(https://ehgt.org/g/${sprite})`;
+                            break;
+                        }
+                    }
+                } else rating.remove();
+                const published = metadata?.querySelector('[id^="posted_"]')?.textContent.trim() || "";
+                const date = item.querySelector(".entry-date");
+                date.textContent = published;
+                if (/^\d{4}-\d{2}-\d{2}/.test(published)) date.dateTime = published.replace(" ", "T");
+                item.querySelector(".entry-pages").textContent = [...(metadata?.children || [])]
+                    .find(node => /\bpages?\b/i.test(node.textContent.trim()))?.textContent.trim() || "";
+                const uploaderNode = metadata?.querySelector('a[href*="/uploader/"]');
+                const uploader = item.querySelector(".entry-uploader");
+                const uploaderUrl = safeUrl(uploaderNode?.getAttribute("href"), ["e-hentai.org"], url);
+                if (uploaderUrl) {
+                    uploader.href = uploaderUrl;
+                    uploader.textContent = `上传者：${uploaderNode.textContent.trim()}`;
+                } else uploader.remove();
+                const torrentNode = metadata?.querySelector(".gldown a");
+                const torrent = item.querySelector(".entry-torrent");
+                const torrentUrl = safeUrl(torrentNode?.getAttribute("href"), ["e-hentai.org"], url);
+                if (torrentUrl) torrent.href = torrentUrl;
+                else torrent.replaceWith(Object.assign(document.createElement("span"), {textContent: "无种子"}));
+
+                const tagsContainer = item.querySelector(".entry-tags");
+                for (const tagRow of detailCell.querySelectorAll(".gl4e table tr")) {
+                    const tags = [...tagRow.querySelectorAll(".gt, .gtl")];
+                    if (!tags.length) continue;
+                    const group = document.createElement("div");
+                    group.className = "tag-group";
+                    const label = document.createElement("span");
+                    label.className = "tag-group-label";
+                    label.textContent = tagRow.querySelector(".tc")?.textContent.trim() || "标签";
+                    const values = document.createElement("div");
+                    values.className = "tag-values";
+                    for (const tag of tags) {
+                        const value = document.createElement("span");
+                        value.textContent = tag.textContent.trim();
+                        values.append(value);
+                    }
+                    group.append(label, values);
+                    tagsContainer.append(group);
+                }
+                fragment.append(item);
+                count++;
+            }
+            gallery.append(fragment);
+            galleryMeta.textContent = `${count} 个条目`;
+            if (!count) gallery.innerHTML = '<p class="empty-result">表格存在，但没有可解析的条目。</p>';
+        } catch (error) {
+            summary.textContent = "浏览器未能向页面提供响应";
+            output.textContent = `${error.name}: ${error.message}\n\n请确认页面地址是 http://127.0.0.1:8765/debug，并且 npm run dev 仍在运行。`;
+            gallery.innerHTML = '<p class="empty-result">解析失败，请查看原始响应框中的错误信息。</p>';
+        } finally {
+            sendButton.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
