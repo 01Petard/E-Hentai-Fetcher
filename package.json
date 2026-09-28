@@ -8,6 +8,7 @@
     "start": "vite preview"
   },
   "dependencies": {
+    "@zip.js/zip.js": "^2.18.2",
     "https-proxy-agent": "^9.1.0",
     "vue": "^3.5.0"
   },

@@ -122,13 +122,13 @@ async function streamImageDownload(url, response, cookie, userAgent, fallbackNam
       if (incoming.statusCode >= 300 && incoming.statusCode < 400 && incoming.headers.location && redirects < 5) {
         const next = validImageDownloadUrl(new URL(incoming.headers.location, url).href);
         incoming.resume();
-        if (next) resolve(streamImageDownload(next, response, cookie, userAgent, fallbackName, redirects + 1, sourceName));
-        else reject(new Error('图片跳转地址无效'));
+        if (next) settle(resolve, streamImageDownload(next, response, cookie, userAgent, fallbackName, redirects + 1, sourceName));
+        else settle(reject, new Error('图片跳转地址无效'));
         return;
       }
       if (incoming.statusCode !== 200 || !/^image\//i.test(incoming.headers['content-type'] || '')) {
         incoming.resume();
-        reject(new Error('图片下载失败'));
+        settle(reject, new Error('图片下载失败'));
         return;
       }
       const mime = incoming.headers['content-type'].split(';', 1)[0].toLowerCase();
@@ -141,11 +141,19 @@ async function streamImageDownload(url, response, cookie, userAgent, fallbackNam
         'Cache-Control': 'no-store',
       });
       incoming.pipe(response);
-      incoming.on('end', resolve);
-      incoming.on('error', reject);
+      incoming.on('end', () => settle(resolve));
+      incoming.on('error', error => settle(reject, error));
     });
+    function onResponseClose() {
+      if (!response.writableEnded) upstream.destroy(new Error('客户端取消下载'));
+    }
+    function settle(callback, value) {
+      response.off('close', onResponseClose);
+      callback(value);
+    }
+    response.once('close', onResponseClose);
     upstream.on('timeout', () => upstream.destroy(new Error('图片下载超时')));
-    upstream.on('error', reject);
+    upstream.on('error', error => settle(reject, error));
     upstream.end();
   });
 }

@@ -1969,6 +1969,36 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
 }
 
 .torrent-link { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: #af654c; font-size: inherit; font-weight: 700; cursor: pointer; }
+.gallery-download-dialog { width: min(640px, calc(100vw - 28px)); max-height: calc(100vh - 40px); padding: 0; overflow-y: auto; border: 1px solid #dce6dc; border-radius: 8px; background: #fff; color: #23382d; box-shadow: 0 24px 70px #172a1b45; }
+.gallery-download-dialog::backdrop { background: #14251bb3; }
+.gallery-download-content { padding: 22px 24px 24px; }
+.gallery-download-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.gallery-download-heading > div { min-width: 0; }
+.gallery-download-heading span { color: #668572; font-size: 11px; font-weight: 700; }
+.gallery-download-heading h2 { margin: 4px 0 0; font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
+.gallery-download-heading .close-button { flex: none; }
+.gallery-download-form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0 0; }
+.gallery-download-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.gallery-download-form legend { margin-bottom: 8px; color: #344f42; font-size: 13px; font-weight: 700; }
+.gallery-download-form label { display: flex; align-items: center; gap: 6px; margin: 7px 0; font-size: 13px; }
+.gallery-download-form input[type="radio"] { accent-color: #187867; }
+.gallery-download-range { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.gallery-download-range input { width: min(100%, 75px); min-width: 0; padding: 6px; border: 1px solid #bfcec1; border-radius: 5px; font: inherit; }
+.gallery-download-note { margin: 14px 0 0; color: #65776b; font-size: 12px; line-height: 1.55; }
+.gallery-download-error { color: #a44f3d; }
+.gallery-download-progress { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 18px; font-size: 12px; }
+.gallery-download-progress strong { font-variant-numeric: tabular-nums; }
+.gallery-download-progress progress { width: 100%; height: 8px; accent-color: #187867; }
+.gallery-download-list { max-height: 220px; overflow: auto; margin-top: 12px; border-top: 1px solid #e4ebe3; }
+.gallery-download-list > div { display: grid; grid-template-columns: 45px minmax(0, 1fr); gap: 10px; padding: 7px 2px; border-bottom: 1px solid #eef2ed; font-size: 12px; }
+.gallery-download-list strong { font-variant-numeric: tabular-nums; }
+.gallery-download-list span { overflow-wrap: anywhere; }
+.gallery-download-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
+.gallery-download-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 7px 12px; border: 1px solid #bdceb9; border-radius: 6px; background: #eff5ed; color: #386248; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.gallery-download-actions button:hover { background: #e1eee0; }
+.gallery-download-actions .gallery-download-primary { border-color: #187867; background: #187867; color: white; }
+.gallery-download-actions .gallery-download-primary:hover { background: #116656; }
+@media (max-width: 560px) { .gallery-download-content { padding: 17px; } .gallery-download-form { grid-template-columns: 1fr; gap: 12px; } .gallery-download-heading h2 { font-size: 16px; } }
 .torrent-link:hover { color: #88442f; text-decoration: underline; }
 .torrent-link:focus-visible { outline: 2px solid #c77459; outline-offset: 3px; }
 .torrent-dialog { width: min(700px, calc(100vw - 28px)); max-height: calc(100vh - 40px); padding: 0; overflow-y: auto; border: 1px solid #dce6dc; border-radius: 14px; background: #fff; color: #23382d; box-shadow: 0 24px 70px #172a1b45; }

@@ -3,6 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {galleryLink, imageLink, localGalleryUrl, localImageUrl, parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {readTagCache, refreshTagTranslations} from '../lib/tagTranslations.js';
 import ImmersiveReader from './ImmersiveReader.vue';
+import GalleryDownloadDialog from './GalleryDownloadDialog.vue';
 import TorrentDialog from './TorrentDialog.vue';
 import UiIcon from './UiIcon.vue';
 
@@ -22,6 +23,9 @@ const jumpError = ref('');
 const jumpInput = ref(null);
 const immersiveOpen = ref(false);
 const torrentDialog = ref(null);
+const galleryDownloadDialog = ref(null);
+const catalogDownloadPending = ref({});
+const catalogDownloadErrors = ref({});
 let requestVersion = 0;
 const spriteObserver = new ResizeObserver(entries => {
   for (const entry of entries) {
@@ -96,10 +100,11 @@ function pageUrl(base, index) {
   return url.href;
 }
 
-async function fetchSource(url) {
+async function fetchSource(url, signal) {
   const response = await fetch('/fetch', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({url, userAgent: navigator.userAgent, extended: true}),
+    signal,
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || '本地请求失败');
@@ -204,8 +209,28 @@ function galleryPageHref(index) {
   return url.pathname + url.search;
 }
 
-function imageDownloadHref(url, variant) {
-  return `/api/image-download?${new URLSearchParams({url, page: String(data.value.number), variant})}`;
+function imageDownloadHref(url, variant, number = data.value.number) {
+  return `/api/image-download?${new URLSearchParams({url, page: String(number), variant})}`;
+}
+
+async function downloadCatalogImage(item, variant) {
+  if (catalogDownloadPending.value[item.number]) return;
+  catalogDownloadPending.value[item.number] = true;
+  catalogDownloadErrors.value[item.number] = '';
+  try {
+    const detail = parseImageDetail(await fetchSource(item.url));
+    const url = variant === 'original' ? detail.original : detail.image;
+    if (!url) throw new Error(variant === 'original' ? '此页未提供原图下载地址' : '此页未提供低保真图下载地址');
+    const link = document.createElement('a');
+    link.href = imageDownloadHref(url, variant, item.number);
+    document.body.append(link);
+    link.click();
+    link.remove();
+  } catch (failure) {
+    catalogDownloadErrors.value[item.number] = failure.message || '图片下载失败';
+  } finally {
+    catalogDownloadPending.value[item.number] = false;
+  }
 }
 
 function changePageSize() {
@@ -293,6 +318,10 @@ onUnmounted(() => {
             <div class="detail-title-row"><span class="category">{{ categoryLabels[data.category] || data.category || '未分类' }}</span><span v-if="data.rating" class="detail-rating">★ {{
                 data.rating
               }}</span>
+              <button class="gallery-download-entry" type="button" @click="galleryDownloadDialog.open(data)">
+                <UiIcon name="download" :size="14"/>
+                批量下载
+              </button>
               <button v-if="data.torrentUrl" class="torrent-link" type="button" @click="torrentDialog.open(data)">
                 <UiIcon :size="14" name="download"/>
                 下载种子
@@ -348,12 +377,27 @@ onUnmounted(() => {
               </nav>
             </div>
           </div>
-          <div v-if="data.images.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }"><a v-for="item in data.images" :key="item.url" :href="localImageUrl(item.url)"
-                                                                                                                class="detail-image-card">
-            <div v-fit-sprite class="detail-sprite-frame">
-              <div class="detail-sprite" :style="{ width: item.width, height: item.height, backgroundImage: `url('${item.sprite}')`, backgroundPosition: item.position }"></div>
+          <div v-if="data.images.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">
+            <div v-for="item in data.images" :key="item.url" class="detail-image-card">
+              <a class="detail-image-link" :href="localImageUrl(item.url)">
+                <div v-fit-sprite class="detail-sprite-frame">
+                  <div class="detail-sprite" :style="{ width: item.width, height: item.height, backgroundImage: `url('${item.sprite}')`, backgroundPosition: item.position }"></div>
+                </div>
+                <span class="detail-image-number">{{ item.number }}</span><span class="detail-image-name" :title="item.name">{{ item.name }}</span>
+              </a>
+              <div class="detail-image-downloads" role="group" :aria-label="`第 ${item.number} 张图片下载`">
+                <button type="button" :disabled="catalogDownloadPending[item.number]" :aria-label="`下载第 ${item.number} 张原图`" @click="downloadCatalogImage(item, 'original')">
+                  <UiIcon name="download" :size="13"/>
+                  原图
+                </button>
+                <button type="button" :disabled="catalogDownloadPending[item.number]" :aria-label="`下载第 ${item.number} 张低保真图`" @click="downloadCatalogImage(item, 'preview')">
+                  <UiIcon name="download" :size="13"/>
+                  高清
+                </button>
+              </div>
+              <span v-if="catalogDownloadErrors[item.number]" class="detail-image-download-error" role="alert">{{ catalogDownloadErrors[item.number] }}</span>
             </div>
-            <span class="detail-image-number">{{ item.number }}</span><span class="detail-image-name" :title="item.name">{{ item.name }}</span></a></div>
+          </div>
           <p v-else>本页没有可显示的图片缩略图。</p></section>
         <details class="detail-section detail-comments" :open="!commentsCollapsed" @toggle="updateCommentsCollapsed">
           <summary><span class="detail-comments-title">评论 <small>{{ data.comments.length }} 条</small></span><span class="detail-comments-toggle">{{ commentsCollapsed ? '展开' : '收起' }}</span>
@@ -392,6 +436,7 @@ onUnmounted(() => {
       </template>
     </main>
     <ImmersiveReader v-if="immersiveOpen && kind === 'gallery' && data" :gallery="data" :fetch-source="fetchSource" @close="immersiveOpen = false"/>
+    <GalleryDownloadDialog ref="galleryDownloadDialog" :fetch-source="fetchSource"/>
     <TorrentDialog ref="torrentDialog"/>
   </div>
 </template>
