@@ -116,6 +116,8 @@ function resetFilters() {
   inputError.value = '';
 }
 
+const siteHomeUrl = computed(() => `${sourceOrigin(preferences.useEx)}/`);
+
 function tagText(tag) {
   if (!preferences.translateTags) return tag.original;
   const translated = tagTranslations.value[tag.key];
@@ -567,6 +569,33 @@ async function runSearch(url, targetIndex = null) {
   }
 }
 
+function goHome() {
+  try { sessionStorage.removeItem(searchSessionKey); } catch { /* The in-memory reset below still applies. */ }
+  searchText.value = '';
+  suggestionOpen.value = false;
+  tagPopover.value = null;
+  activeQuickLink.value = '';
+  resetFilters();
+  requestUrl.value = '';
+  pageIndex.value = 0;
+  pageSize.value = 0;
+  void runSearch(siteHomeUrl.value, 0);
+}
+
+function handleHomeClick(event) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  goHome();
+}
+
+function isPageReload() {
+  try {
+    const type = performance.getEntriesByType?.('navigation')?.[0]?.type;
+    if (typeof type === 'string') return type === 'reload';
+    return performance.navigation?.type === 1;
+  } catch { return false; }
+}
+
 function submitSearch() {
   inputError.value = '';
   suggestionOpen.value = false;
@@ -601,8 +630,12 @@ function navigate(page) {
 }
 
 onMounted(async () => {
+  const pageReload = isPageReload();
+  if (pageReload) {
+    try { sessionStorage.removeItem(searchSessionKey); } catch { /* The reload still starts from the site home. */ }
+  }
   try {
-    const saved = JSON.parse(sessionStorage.getItem(searchSessionKey));
+    const saved = pageReload ? null : JSON.parse(sessionStorage.getItem(searchSessionKey));
     if (saved && typeof saved === 'object') {
       if (typeof saved.searchText === 'string') searchText.value = saved.searchText;
       if (['thumbnail', 'extended', 'minimal'].includes(saved.view)) view.value = saved.view;
@@ -687,12 +720,12 @@ onUnmounted(() => {
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <a class="brand" href="/" aria-label="Gallery Lens，返回主页">
+      <a class="brand" :href="siteHomeUrl" aria-label="Gallery Lens，访问站点首页" @click="handleHomeClick">
         <span class="brand-mark">E<span>·</span></span>
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
-        <a href="/" aria-current="page"><UiIcon name="home" :size="15" /> 主页</a>
+        <a :href="siteHomeUrl" @click="handleHomeClick"><UiIcon name="home" :size="15" /> 主页</a>
         <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
