@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { request as httpsRequest } from 'node:https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -52,7 +52,7 @@ async function readJson(request) {
   }
 }
 
-async function readCookie() {
+async function readLocalCookie() {
   try {
     const content = await readFile(cookieFile, 'utf8');
     return content.split(/\r?\n/).find(line => line.startsWith('EH_COOKIE='))?.slice('EH_COOKIE='.length) || '';
@@ -60,6 +60,18 @@ async function readCookie() {
     if (error.code === 'ENOENT') return '';
     throw error;
   }
+}
+
+async function readCookie(request) {
+  const header = request.headers.cookie || '';
+  const stored = header.split(';').map(part => part.trim()).find(part => part.startsWith('eh_cookie='));
+  if (stored) {
+    try {
+      const cookie = decodeURIComponent(stored.slice('eh_cookie='.length));
+      return validCookie(cookie) ? cookie : '';
+    } catch { return ''; }
+  }
+  return readLocalCookie();
 }
 
 function validCookie(value) {
@@ -293,7 +305,7 @@ async function route(request, response) {
     return;
   }
   if (path === '/api/config' && request.method === 'GET') {
-    sendJson(response, 200, { configured: Boolean(await readCookie()) });
+    sendJson(response, 200, { configured: Boolean(await readCookie(request)) });
     return;
   }
   if (path === '/api/gallery-posted' && request.method === 'POST') {
@@ -307,7 +319,7 @@ async function route(request, response) {
     if (typeof payload.userAgent !== 'string' || !payload.userAgent || payload.userAgent.length > 512 || /[\r\n]/.test(payload.userAgent)) {
       throw new Error('User-Agent 无效');
     }
-    const cookie = await readCookie();
+    const cookie = await readCookie(request);
     if (!validCookie(cookie)) throw new Error('请先在配置菜单中保存 Cookie');
     const body = JSON.stringify({ method: 'gdata', gidlist: payload.galleries });
     const upstream = await fetchHtml('https://api.e-hentai.org/api.php', {
@@ -344,9 +356,8 @@ async function route(request, response) {
   if (path === '/api/config/cookie' && request.method === 'PUT') {
     const payload = await readJson(request);
     if (!validCookie(payload.cookie)) throw new Error('Cookie 无效');
-    const pending = new URL('../.env.local.tmp', import.meta.url);
-    await writeFile(pending, `EH_COOKIE=${payload.cookie.trim()}\n`, { mode: 0o600 });
-    await rename(pending, cookieFile);
+    const secure = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+    response.setHeader('Set-Cookie', `eh_cookie=${encodeURIComponent(payload.cookie.trim())}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`);
     sendJson(response, 200, { configured: true });
     return;
   }
@@ -377,7 +388,7 @@ async function route(request, response) {
     if (!Number.isSafeInteger(number) || number < 1) throw new Error('图片页码无效');
     const variant = params.get('variant');
     if (!['preview', 'original'].includes(variant)) throw new Error('图片类型无效');
-    const cookie = await readCookie();
+    const cookie = await readCookie(request);
     await streamImageDownload(target, response, cookie, request.headers['user-agent'] || 'Gallery-Lens', `page-${number}-${variant}`);
     return;
   }
@@ -391,7 +402,7 @@ async function route(request, response) {
       throw new Error('仅允许请求 https://e-hentai.org/ 下的地址');
     }
     if (payload.cookie !== undefined && payload.cookie !== '' && !validCookie(payload.cookie)) throw new Error('Cookie 无效');
-    let cookie = payload.cookie || await readCookie();
+    let cookie = payload.cookie || await readCookie(request);
     if (!validCookie(cookie)) throw new Error('请先在配置菜单中保存 Cookie');
     if (typeof payload.userAgent !== 'string' || !payload.userAgent || payload.userAgent.length > 512 || /[\r\n]/.test(payload.userAgent)) {
       throw new Error('User-Agent 无效');
