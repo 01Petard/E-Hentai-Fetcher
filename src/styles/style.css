@@ -60,7 +60,9 @@ a {
 .brand {
     display: flex;
     align-items: center;
-    gap: 11px
+    gap: 11px;
+    color: inherit;
+    text-decoration: none
 }
 
 .brand-mark {
@@ -148,7 +150,7 @@ a {
 main {
     width: min(1260px, 100%);
     margin: 0 auto;
-    padding: 36px 24px 80px;
+    padding: 16px 24px 24px;
     flex: 1
 }
 
@@ -1653,7 +1655,6 @@ a {
 
 /* Search and results share the first viewport. */
 .site-header { height: 60px; }
-main { padding-top: 16px; }
 .search-hero { padding: 18px 24px 14px; border-radius: 14px; }
 .hero-copy h1 { margin: 0 0 3px; font-size: clamp(23px, 2.5vw, 32px); }
 .hero-copy p { margin-bottom: 12px; font-size: 12px; }
@@ -1798,6 +1799,8 @@ main { padding-top: 16px; }
 .quick-link-actions > div, .dialog-actions > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .quick-link-actions .settings-action-button, .dialog-actions .settings-action-button { min-height: 34px; }
 .settings-message { margin: 8px 0 0; color: #396b4c; font-size: 11px; }
+.settings-reset { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #e2e9df; }
+.settings-reset span { color: #607565; font-size: 11px; }
 .cookie-settings { border-top: 1px solid #e2e9df; margin-top: 22px; padding-top: 20px; }
 .response-source { width: min(100%, 900px); margin-top: 14px; text-align: left; }
 .response-source summary { cursor: pointer; color: #8f563f; font-size: 12px; font-weight: 700; }
@@ -1899,7 +1902,7 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
 .feature-switches label, .tag-update-controls label { display: inline-flex; align-items: center; gap: 7px; color: #3d5645; font-size: 12px; cursor: pointer; }
 .feature-switches input, .tag-update-controls input { accent-color: #4d9f78; }
 .immersive-cache-settings { display: grid; grid-template-columns: minmax(0, 1fr) 104px; align-items: center; gap: 10px 12px; color: #3d5645; font-size: 12px; }
-.immersive-cache-settings > label:first-child { grid-column: 1 / -1; }
+.immersive-cache-settings > label:nth-child(-n+3) { grid-column: 1 / -1; }
 .immersive-cache-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 15px; color: #3d5645; font-size: 12px; }
 .immersive-cache-settings label { display: inline-flex; align-items: center; gap: 7px; }
 .immersive-cache-settings input { accent-color: #4d9f78; }

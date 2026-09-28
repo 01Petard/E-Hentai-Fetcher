@@ -223,7 +223,7 @@
       body { max-width: none; min-width: 320px; margin: 0; padding: 0; }
       .debug-shell { min-height: 100vh; display: flex; flex-direction: column; }
       .site-header { height: 60px; padding: 0 max(24px, calc((100vw - 1260px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid #e3e6e3; background: #fff; box-shadow: 0 1px 0 #ffffffa8; }
-      .brand { display: flex; align-items: center; gap: 11px; }
+      .brand { display: flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; }
       .brand-mark { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding-right: 3px; border-radius: 11px; background: #233d42; color: #fff; font: 25px/1 Georgia, serif; letter-spacing: -.09em; }
       .brand-mark span { position: absolute; right: 8px; bottom: 5px; color: #f6b27e; font-size: 19px; }
       .brand strong { display: block; font-size: 16px; letter-spacing: -.04em; line-height: 1.1; }
@@ -259,15 +259,18 @@
       .content-toolbar .view-switch { grid-column: 3; justify-self: end; }
       .gallery-list { margin-top: 12px; }
       .debug-nav a[aria-current="page"] { color: #2f5b40; }
-      @media (max-width: 600px) {
-          .site-header { height: 56px; padding: 0 12px; gap: 8px; }
+      @media (max-width: 620px) { .site-header { height: 56px; } }
+      @media (max-width: 560px) {
+          .site-header { padding: 0 12px; gap: 8px; }
           .brand-mark { width: 35px; height: 35px; font-size: 21px; }
           .brand strong { font-size: 14px; }
           .brand small { font-size: 9px; }
           .header-actions { gap: 8px; font-size: 10px; }
-          .header-actions a { min-height: 34px; font-size: 10px; }
+          .header-actions a { font-size: 10px; }
           .header-actions a svg { display: none; }
           .header-actions .settings-trigger { min-height: 34px; padding: 6px 7px; gap: 6px; }
+      }
+      @media (max-width: 600px) {
           .site-footer { height: 60px; padding: 0 17px; }
           .debug-main { padding: 10px 14px 40px; }
           .debug-request-card, .result-section { padding: 14px; }
@@ -283,7 +286,7 @@
 <body>
 <div class="debug-shell">
   <header class="site-header">
-    <div class="brand" aria-label="Gallery Lens"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></div>
+    <a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
     <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/">主页</a><a href="/debug" aria-current="page"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5h6v6M19 5l-9 9"/><path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/></svg> 调试页面</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
   </header>
 <main class="debug-main">

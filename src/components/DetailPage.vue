@@ -24,6 +24,7 @@ const jumpInput = ref(null);
 const immersiveOpen = ref(false);
 const torrentDialog = ref(null);
 const galleryDownloadDialog = ref(null);
+const cookieConfigured = ref(false);
 const catalogDownloadPending = ref({});
 const catalogDownloadErrors = ref({});
 let requestVersion = 0;
@@ -271,6 +272,7 @@ function onKeydown(event) {
 }
 
 onMounted(async () => {
+  fetch('/api/config').then(response => response.json()).then(config => { cookieConfigured.value = Boolean(config.configured); }).catch(() => {});
   try {
     const cached = Number(localStorage.getItem('gallery-lens.gallery-page-size'));
     if ([20, 40, 60, 80, 100].includes(cached)) pageSize.value = cached;
@@ -303,8 +305,8 @@ onUnmounted(() => {
 
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
-    <header class="site-header"><a class="brand" href="/"><span class="brand-mark">E<span>·</span></span><span><strong>Gallery Lens</strong><small>在线图库检索</small></span></a>
-      <nav class="header-actions"><a href="/">返回搜索</a><a v-if="source" :href="source" target="_blank" rel="noopener noreferrer">原站页面 ↗</a></nav>
+    <header class="site-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
+      <nav class="header-actions" aria-label="页面导航"><a href="/">主页</a><a href="/debug"><UiIcon name="external" :size="15"/> 调试页面</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
       <div v-if="loading" class="detail-state" role="status"><span class="spinner"></span>
@@ -318,6 +320,7 @@ onUnmounted(() => {
             <div class="detail-title-row"><span class="category">{{ categoryLabels[data.category] || data.category || '未分类' }}</span><span v-if="data.rating" class="detail-rating">★ {{
                 data.rating
               }}</span>
+              <a v-if="source" class="detail-source-link" :href="source" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="14"/>原站页面</a>
               <button class="gallery-download-entry" type="button" @click="galleryDownloadDialog.open(data)">
                 <UiIcon name="download" :size="14"/>
                 批量下载
@@ -353,13 +356,15 @@ onUnmounted(() => {
         </section>
         <section class="detail-section detail-catalog">
           <div class="detail-section-heading">
-            <div><h2><UiIcon name="image" :size="23"/>图片目录 <small>{{ data.imageRange }}</small></h2></div>
-            <div class="detail-gallery-controls">
+            <div class="detail-catalog-title">
+              <h2><UiIcon name="image" :size="23"/>图片目录 <small>{{ data.imageRange }}</small></h2>
               <div class="detail-gallery-settings"><label for="gallery-page-size">每页数量 <select id="gallery-page-size" v-model.number="pageSize" @change="changePageSize">
                 <option v-for="size in [20, 40, 60, 80, 100]" :key="size" :value="size">{{ size }}</option>
               </select></label><label for="gallery-columns">每行数量 <select id="gallery-columns" v-model.number="columns" @change="changeColumns">
                 <option v-for="count in [5, 6, 7, 8, 9, 10]" :key="count" :value="count">{{ count }}</option>
               </select></label></div>
+            </div>
+            <div class="detail-gallery-controls">
               <nav v-if="totalPages > 1" class="detail-pages" aria-label="图片目录分页">
                 <button type="button" :disabled="pageIndex === 0" @click="navigateGallery(0)">第一页</button>
                 <button type="button" :disabled="pageIndex === 0" @click="navigateGallery(pageIndex - 1)">上一页</button>
@@ -413,10 +418,14 @@ onUnmounted(() => {
         <nav class="detail-breadcrumb" aria-label="当前位置"><a href="/">搜索结果</a><span>/</span><a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">画廊详情</a><span>/</span><span>第 {{
             data.number
           }} 页</span></nav>
-        <div class="reader-heading">
-          <div><h1>{{ data.title }}</h1>
-            <p>{{ data.info }}</p></div>
-          <strong>{{ data.number }} <span>/ {{ data.total || '?' }}</span></strong></div>
+        <div class="detail-overview-heading reader-overview-heading">
+          <a v-if="source" class="detail-source-link" :href="source" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="14"/>原站页面</a>
+          <div class="reader-heading">
+            <div><h1>{{ data.title }}</h1>
+              <p>{{ data.info }}</p></div>
+            <strong>{{ data.number }} <span>/ {{ data.total || '?' }}</span></strong>
+          </div>
+        </div>
         <nav class="reader-controls" aria-label="图片导航">
           <button type="button" :disabled="!data.prev" @click="navigate(data.prev)">← 上一页</button>
           <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">返回图片目录</a>

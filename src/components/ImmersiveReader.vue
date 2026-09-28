@@ -2,6 +2,7 @@
 import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {cachedImmersiveImage, cancelPendingImmersiveImages, clearImmersiveCache, getImmersiveCacheStats, immersivePreloadWindow, preloadImmersiveImage, subscribeImmersiveCache} from '../lib/immersiveCache.js';
+import {readImmersiveProgress, saveImmersiveProgress} from '../lib/immersiveProgress.js';
 
 const props = defineProps({gallery: {type: Object, required: true}, fetchSource: {type: Function, required: true}});
 const emit = defineEmits(['close']);
@@ -17,6 +18,8 @@ const settingsOpen = ref(false);
 const preloadEnabled = ref(true);
 const preloadAfterCount = ref(20);
 const preloadBeforeCount = ref(10);
+const saveProgress = ref(false);
+const imageSnap = ref(false);
 const cacheStats = ref(getImmersiveCacheStats());
 const total = computed(() => props.gallery.totalImages);
 const pageCount = computed(() => pages.value.length || 1);
@@ -94,6 +97,7 @@ async function show(number, navigation = '') {
     else if (navigation === 'jump') backStack.length = 0;
     first.value = target;
     pages.value = prepared;
+    saveImmersiveProgress(props.gallery.source, target, saveProgress.value);
     changed = true;
   } catch (failure) {
     if (current === version) error.value = failure.message || '图片加载失败';
@@ -136,11 +140,12 @@ async function warmNearby() {
   void Promise.all([worker(), worker()]);
 }
 
-function savePreloadSettings() {
+function saveReaderSettings() {
   try {
     const preferences = JSON.parse(localStorage.getItem('gallery-lens.preferences')) || {};
-    localStorage.setItem('gallery-lens.preferences', JSON.stringify({...preferences, immersivePreload: preloadEnabled.value, immersivePreloadCount: preloadAfterCount.value, immersivePreloadBeforeCount: preloadBeforeCount.value}));
+    localStorage.setItem('gallery-lens.preferences', JSON.stringify({...preferences, immersivePreload: preloadEnabled.value, immersivePreloadCount: preloadAfterCount.value, immersivePreloadBeforeCount: preloadBeforeCount.value, immersiveSaveProgress: saveProgress.value, immersiveImageSnap: imageSnap.value}));
   } catch { /* Settings still work for this session. */ }
+  if (saveProgress.value && pages.value.length) saveImmersiveProgress(props.gallery.source, first.value, true);
   if (preloadEnabled.value) void warmNearby();
   else void clearReaderCache();
 }
@@ -258,6 +263,8 @@ onMounted(async () => {
     if (typeof saved?.immersivePreload === 'boolean') preloadEnabled.value = saved.immersivePreload;
     if ([10, 20, 40, 60].includes(Number(saved?.immersivePreloadCount))) preloadAfterCount.value = Number(saved.immersivePreloadCount);
     if ([0, 5, 10, 20].includes(Number(saved?.immersivePreloadBeforeCount))) preloadBeforeCount.value = Number(saved.immersivePreloadBeforeCount);
+    if (typeof saved?.immersiveSaveProgress === 'boolean') saveProgress.value = saved.immersiveSaveProgress;
+    if (typeof saved?.immersiveImageSnap === 'boolean') imageSnap.value = saved.immersiveImageSnap;
   } catch { /* Use default preload settings. */ }
   unsubscribeCache = subscribeImmersiveCache(stats => { cacheStats.value = stats; });
   previousOverflow = document.body.style.overflow;
@@ -270,7 +277,7 @@ onMounted(async () => {
   hintTimer = setTimeout(() => {
     hintVisible.value = false;
   }, 3000);
-  await show(1);
+  await show(readImmersiveProgress(props.gallery.source, total.value, saveProgress.value));
 });
 onUnmounted(() => {
   version++;
@@ -295,8 +302,11 @@ onUnmounted(() => {
                @mousemove="revealControls">
         <header class="immersive-header" :inert="fullscreen && !controlsVisible">
           <div class="immersive-actions">
-            <button type="button" aria-label="预载入配置" @click="settingsOpen = true; controlsVisible = true">
+            <button type="button" aria-label="沉浸式浏览配置" @click="settingsOpen = true; controlsVisible = true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.8-2.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.8v-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>
+            </button>
+            <button type="button" :aria-label="imageSnap ? '关闭图片吸附' : '开启图片吸附'" :aria-pressed="imageSnap" title="图片吸附" @click="imageSnap = !imageSnap; saveReaderSettings()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h6m-3-3 3 3-3 3m15-3h-6m3-3-3 3 3 3"/></svg>
             </button>
             <button type="button" :aria-label="fullscreen ? '退出全屏' : '全屏浏览'" @click="toggleFullscreen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -312,7 +322,7 @@ onUnmounted(() => {
         </header>
         <div class="immersive-stage">
           <button class="immersive-turn" type="button" aria-label="向左翻页" :disabled="first === 1" :inert="fullscreen && !controlsVisible" @click="previousPage">‹</button>
-          <div class="immersive-spread" :class="{'immersive-spread-single': pageCount === 1}">
+          <div class="immersive-spread" :class="{'immersive-spread-single': pageCount === 1, 'immersive-spread-snapped': imageSnap && pageCount === 2}">
             <div v-for="(page, slot) in pages" :key="first + slot" class="immersive-page">
               <img :src="page.displayUrl" :alt="`第 ${first + slot} 页`" referrerpolicy="no-referrer" fetchpriority="high"/>
               <span class="immersive-page-number">{{ first + slot }} / {{ total }}</span>
@@ -335,11 +345,13 @@ onUnmounted(() => {
                                                                                                         @pointerup="onProgressPointerUp" @pointercancel="onProgressPointerUp"/></div>
         </footer>
         <div v-if="settingsOpen" class="immersive-settings-backdrop" @click.self="closeSettings">
-          <section class="immersive-settings-panel" role="dialog" aria-modal="true" aria-label="沉浸式预载入配置">
-            <div class="immersive-settings-heading"><h2>沉浸式预载入</h2><button type="button" aria-label="关闭配置" @click="closeSettings">×</button></div>
-            <label class="immersive-settings-option"><input v-model="preloadEnabled" type="checkbox" @change="savePreloadSettings"/> 启用预载入</label>
-            <label class="immersive-settings-option" for="reader-preload-count">向后预载入 <select id="reader-preload-count" v-model.number="preloadAfterCount" :disabled="!preloadEnabled" @change="savePreloadSettings"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select></label>
-            <label class="immersive-settings-option" for="reader-preload-before-count">向前预载入 <select id="reader-preload-before-count" v-model.number="preloadBeforeCount" :disabled="!preloadEnabled" @change="savePreloadSettings"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></label>
+          <section class="immersive-settings-panel" role="dialog" aria-modal="true" aria-label="沉浸式浏览配置">
+            <div class="immersive-settings-heading"><h2>沉浸式浏览</h2><button type="button" aria-label="关闭配置" @click="closeSettings">×</button></div>
+            <label class="immersive-settings-option"><input v-model="saveProgress" type="checkbox" @change="saveReaderSettings"/> 保存浏览进度</label>
+            <label class="immersive-settings-option"><input v-model="imageSnap" type="checkbox" @change="saveReaderSettings"/> 图片吸附</label>
+            <label class="immersive-settings-option"><input v-model="preloadEnabled" type="checkbox" @change="saveReaderSettings"/> 启用预载入</label>
+            <label class="immersive-settings-option" for="reader-preload-count">向后预载入 <select id="reader-preload-count" v-model.number="preloadAfterCount" :disabled="!preloadEnabled" @change="saveReaderSettings"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select></label>
+            <label class="immersive-settings-option" for="reader-preload-before-count">向前预载入 <select id="reader-preload-before-count" v-model.number="preloadBeforeCount" :disabled="!preloadEnabled" @change="saveReaderSettings"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></label>
             <div class="immersive-settings-cache"><span>已缓存 {{ cacheStats.ready }} 张<span v-if="cacheStats.loading"> · 加载中 {{ cacheStats.loading }} 张</span></span><button type="button" :disabled="!cacheStats.ready && !cacheStats.loading" @click="clearReaderCache">清理缓存</button></div>
             <p>仅缓存预览图；关闭阅读窗后自动清空。</p>
           </section>

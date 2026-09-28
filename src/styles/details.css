@@ -7,15 +7,6 @@
     text-decoration: none
 }
 
-.detail-shell .brand > span:last-child {
-    display: flex;
-    flex-direction: column
-}
-
-.detail-shell .brand small {
-    display: block
-}
-
 .detail-main {
     max-width: 1260px;
     margin: auto;
@@ -434,9 +425,6 @@
         padding: 8px
     }
 
-    .detail-shell .header-actions a:last-child {
-        display: none
-    }
 }
 
 .detail-title-row { flex-wrap: wrap; }
@@ -829,36 +817,6 @@
 }
 
 /* Compact gallery and reader layout. */
-.detail-shell .site-header {
-    height: 56px;
-    padding-inline: max(18px, calc((100vw - 1260px) / 2))
-}
-
-.detail-shell .brand-mark {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    font-size: 22px
-}
-
-.detail-shell .brand {
-    gap: 8px
-}
-
-.detail-shell .brand strong {
-    font-size: 14px
-}
-
-.detail-shell .brand small {
-    font-size: 9px;
-    margin-top: 2px
-}
-
-.detail-shell .header-actions {
-    gap: 16px;
-    font-size: 12px
-}
-
 .detail-main {
     padding: 18px 18px 48px
 }
@@ -1055,10 +1013,6 @@
         padding: 14px 12px 36px
     }
 
-    .detail-shell .site-header {
-        padding-inline: 12px
-    }
-
     .detail-overview {
         grid-template-columns:94px minmax(0, 1fr);
         gap: 11px;
@@ -1236,6 +1190,14 @@
     gap: 4px
 }
 
+.immersive-spread.immersive-spread-snapped,
+.immersive-reader:fullscreen .immersive-spread.immersive-spread-snapped {
+    gap: 0
+}
+
+.immersive-spread-snapped .immersive-page:first-child img { object-position: right center }
+.immersive-spread-snapped .immersive-page:nth-child(2) img { object-position: left center }
+
 .immersive-reader:fullscreen .immersive-page {
     background: #080a0e
 }
@@ -1310,6 +1272,8 @@
 .immersive-actions button:hover {
     background: #ffffff25
 }
+
+.immersive-actions button[aria-pressed="true"] { background: #3985f466 }
 
 .immersive-actions svg {
     width: 23px;
@@ -1420,26 +1384,28 @@
 .immersive-progress {
     display: flex;
     align-items: center;
-    gap: 18px
+    gap: 12px;
+    width: min(100%, 680px);
+    margin-inline: auto
 }
 
 .immersive-progress strong {
-    min-width: 68px;
-    font-size: 16px;
+    min-width: 58px;
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap
 }
 
 .immersive-progress strong span {
     color: #c1c7d2;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 400
 }
 
 .immersive-progress input {
     flex: 1;
     min-width: 0;
-    height: 7px;
+    height: 5px;
     margin: 0;
     appearance: none;
     border-radius: 10px;
@@ -1449,8 +1415,8 @@
 
 .immersive-progress input::-webkit-slider-thumb {
     appearance: none;
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     border: 0;
     border-radius: 50%;
     background: #f4f7ff;
@@ -1458,8 +1424,8 @@
 }
 
 .immersive-progress input::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     border: 0;
     border-radius: 50%;
     background: #f4f7ff
@@ -1798,6 +1764,26 @@
     border-color: #e5eeea
 }
 
+.detail-source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    color: #17655a;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none
+}
+
+.detail-source-link:hover { text-decoration: underline }
+.detail-source-link:focus-visible { outline: 2px solid #17655a; outline-offset: 3px }
+
+.reader-overview-heading { display: flex; flex-direction: column; gap: 8px }
+.reader-overview-heading .detail-source-link { align-self: flex-end }
+.reader-overview-heading .reader-heading { width: 100% }
+.reader-overview-heading .reader-heading h1 { font-size: clamp(22px, 2.7vw, 32px); margin: 0 0 8px }
+
 .detail-overview-heading h1 {
     margin: 8px 0 3px;
     font-size: clamp(14px, 1.65vw, 18px);
@@ -1839,8 +1825,12 @@
 }
 
 .detail-title-row .torrent-link {
+    gap: 5px;
     font-size: 13px
 }
+
+.detail-title-row .gallery-download-entry,
+.detail-title-row .torrent-link { min-height: 34px; font-family: inherit }
 
 .immersive-entry {
     float: none;
@@ -1999,6 +1989,13 @@
 
 .detail-catalog .detail-section-heading {
     margin-bottom: 16px
+}
+
+.detail-catalog-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px
 }
 
 .detail-catalog h2 {

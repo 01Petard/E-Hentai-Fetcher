@@ -7,6 +7,7 @@ import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
 import TorrentDialog from './components/TorrentDialog.vue';
 import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
+import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 
 const searchText = ref('');
 const defaultQuickLinks = [
@@ -47,7 +48,8 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const preferences = reactive({ translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10 });
+const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false };
+const preferences = reactive({...defaultPreferences});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
 const suggestionOpen = ref(false);
@@ -71,6 +73,7 @@ const configError = ref('');
 const configMessage = ref('');
 const savingCookie = ref(false);
 const clearingCookie = ref(false);
+const resettingSettings = ref(false);
 const settingsDialog = ref(null);
 const resultsHeading = ref(null);
 const searchInput = ref(null);
@@ -482,11 +485,36 @@ async function clearCookie() {
     rawResponse.value = '';
     clearImmersiveCache();
     configMessage.value = data.configured ? '浏览器 Cookie 已清理，当前使用本地备用配置。' : '浏览器 Cookie 已清理。';
+    return true;
   } catch (failure) {
     configError.value = failure.message || '清理失败';
+    return false;
   } finally {
     clearingCookie.value = false;
   }
+}
+
+async function resetSettings() {
+  resettingSettings.value = true;
+  if (!(await clearCookie())) {
+    resettingSettings.value = false;
+    return;
+  }
+  preferencesReady = false;
+  Object.assign(preferences, defaultPreferences);
+  quickLinks.value = defaultQuickLinks;
+  quickLinkDrafts.value = defaultQuickLinks.map(item => ({...item}));
+  quickLinkError.value = '';
+  quickLinkMessage.value = '';
+  clearImmersiveProgress();
+  clearImmersiveCache();
+  await nextTick();
+  try {
+    for (const key of [preferencesKey, quickLinksStorageKey, 'gallery-lens.gallery-page-size', 'gallery-lens.gallery-columns', 'gallery-lens.comments-collapsed']) localStorage.removeItem(key);
+  } catch { /* The current page still uses the default settings. */ }
+  preferencesReady = true;
+  configMessage.value = '已恢复默认配置，并清除浏览器 Cookie 和已保存的浏览进度。';
+  resettingSettings.value = false;
 }
 
 async function runSearch(url, targetIndex = null) {
@@ -591,7 +619,7 @@ onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
-      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload']) {
+      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap']) {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
@@ -644,10 +672,10 @@ onUnmounted(() => {
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <div class="brand" aria-label="Gallery Lens">
+      <a class="brand" href="/" aria-label="Gallery Lens，返回主页">
         <span class="brand-mark">E<span>·</span></span>
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
-      </div>
+      </a>
       <nav class="header-actions" aria-label="页面导航">
         <a href="/" aria-current="page">主页</a>
         <a href="/debug"><UiIcon name="external" :size="15" /> 调试页面</a>
@@ -805,8 +833,8 @@ onUnmounted(() => {
             <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
             <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
           </div>
-          <h3>沉浸式预载入</h3>
-          <div class="immersive-cache-settings"><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向后预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select><label for="immersive-preload-before-count">向前预载入</label><select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></div>
+          <h3>沉浸式浏览</h3>
+          <div class="immersive-cache-settings"><label><input v-model="preferences.immersiveSaveProgress" type="checkbox"/> 保存浏览进度</label><label><input v-model="preferences.immersiveImageSnap" type="checkbox"/> 图片吸附</label><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向后预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select><label for="immersive-preload-before-count">向前预载入</label><select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></div>
           <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button class="settings-action-button" type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>
           <p class="immersive-cache-note">只缓存图片详情页预览图；关闭阅读窗时自动清空。</p>
           <h3>标签数据库</h3>
@@ -826,6 +854,7 @@ onUnmounted(() => {
         <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
         <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
         <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><p v-else-if="configMessage" class="settings-message" role="status">{{ configMessage }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><div><button class="settings-action-button" type="button" :disabled="clearingCookie || savingCookie || !cookieConfigured" @click="clearCookie">{{ clearingCookie ? '清理中…' : '清理 Cookie' }}</button><button class="settings-action-button" type="submit" :disabled="savingCookie || clearingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}</button></div></div></form>
+        <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie" @click="resetSettings">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div>
         </section>
       </div>
     </dialog>
