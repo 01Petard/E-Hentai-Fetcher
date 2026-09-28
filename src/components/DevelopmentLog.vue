@@ -49,6 +49,6 @@ const groupedUpdates = computed(() => {
       </section>
     </main>
 
-    <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log" aria-current="page">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">作者主页 <UiIcon name="external" :size="13" /></a></nav></footer>
+    <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log" aria-current="page">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer"><UiIcon name="blog" :size="13" /> 作者主页</a></nav></footer>
   </div>
 </template>

@@ -1,10 +1,11 @@
-const flags = ['f_sh', 'f_sto', 'f_sfl', 'f_sfu', 'f_sft'];
+import {sourceOrigin} from './sourceSite.js';
 
+const flags = ['f_sh', 'f_sto', 'f_sfl', 'f_sfu', 'f_sft'];
 function encodeSearch(value) {
   return encodeURIComponent(value).replace(/%20/g, '+').replace(/%3A/gi, ':');
 }
 
-export function buildSearchUrl(term, options) {
+export function buildSearchUrl(term, options, useEx = false) {
   if (!term.trim()) throw new Error('请输入搜索内容');
   const params = [`f_search=${encodeSearch(term)}`];
   if (options.advanced) {
@@ -29,5 +30,5 @@ export function buildSearchUrl(term, options) {
     for (const key of flags.slice(2)) if (options[key]) params.push(`${key}=on`);
     params.push('advsearch=1');
   }
-  return `https://e-hentai.org/?${params.join('&')}`;
+  return `${sourceOrigin(useEx)}/?${params.join('&')}`;
 }

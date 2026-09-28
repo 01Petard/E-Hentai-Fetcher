@@ -15,17 +15,28 @@
 
 ## 快速开始
 
+### Cookie 和数据安全
+
 首次使用时，在主页右上角的“配置”中保存 E-Hentai 的 Cookie 请求头值。
 
 如何获取自己的 E-Hentai 账号的 Cookie ：👇
 
-![](https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281017332.jpg)
+<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281017332.jpg" style="zoom:25%;" />
 
 Cookie 保存在当前浏览器的 `eh_cookie` 中，页面不会回显；不同浏览器互不共享。
 
 ⚠️**注意**：未设置浏览器 Cookie 时，代理可读取项目根目录的 **`.env.local`** 作为本地调试兜底。**多用户部署不要配置该兜底文件**（⚠️‼️非常重要‼️⚠️），以免未配置 Cookie 的用户共用账号，泄露个人隐私。
 
 快捷链接和浏览偏好保存在浏览器中，搜索状态保存在当前标签页会话中。标签数据库使用服务端缓存和浏览器 IndexedDB；沉浸式图片预载入缓存可在配置中清理。**不要将 Cookie 提交到版本库或写入日志**。
+
+### 如何开启EX？
+
+> 参考来源：
+>
+> - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/2662
+> - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/1065
+
+这是一个老生常谈的话题，简单来说，里站会检测你的 IP 风险，欧美节点风险较低，香港日韩偏高，高风险节点可能会导致访问失败，每当访问失败时，里站都会以浏览器Cookie的形式进行记录，并阻止此后的任何访问。所以，如果想要测试账号是否获得权限，务必首先清除里站的Cookie，然后再重新[登录](https://forums.e-hentai.org)，并去[用户配置](https://e-hentai.org/uconfig.php)中确认是否欧美。
 
 ## 本地运行
 
@@ -37,9 +48,9 @@ pnpm i
 
 打开 <http://127.0.0.1:8765/>，调试页位于 <http://127.0.0.1:8765/debug>
 
-## Vercel 部署
+## 线上部署
 
-以项目根目录部署，使用 Vite 构建并将输出目录设为 `dist`。`api/` 中的函数处理线上接口，`vercel.json` 提供 `/fetch`、`/debug` 和 `/development-log` 路由；只上传 `dist` 会导致接口返回 404。线上不要配置 `.env.local`。
+该项目目前通过 Vercel 以项目根目录部署，使用 Vite 构建并将输出目录设为 `dist`，`api/` 中的函数处理线上接口，`vercel.json` 提供 `/fetch`、`/debug` 和 `/development-log` 路由；只上传 `dist` 会导致接口返回 404。线上不要配置 `.env.local`。
 
 ## 使用限制
 

@@ -8,6 +8,9 @@ import UiIcon from './components/UiIcon.vue';
 import TorrentDialog from './components/TorrentDialog.vue';
 import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
 import {clearImmersiveProgress} from './lib/immersiveProgress.js';
+import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
+import LoadingIndicator from './components/LoadingIndicator.vue';
+import {sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 
 const searchText = ref('');
 const defaultQuickLinks = [
@@ -26,7 +29,6 @@ const quickLinkImportInput = ref(null);
 const activeQuickLink = ref('');
 const quickLinksStorageKey = 'gallery-lens.quick-links';
 const searchSessionKey = 'gallery-lens.search-session';
-const defaultGalleryUrl = 'https://e-hentai.org/';
 const filters = reactive({
   advanced: false,
   f_sh: false,
@@ -48,7 +50,7 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false };
+const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false };
 const preferences = reactive({...defaultPreferences});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
@@ -326,6 +328,12 @@ watch(preferences, value => {
   if (value.autoUpdate) updateTagData();
 }, { deep: true });
 
+watch(() => preferences.useEx, () => {
+  if (!preferencesReady) return;
+  pageSize.value = 0;
+  void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, 0);
+});
+
 function saveSearchSession() {
   if (!searchSessionReady) return;
   try {
@@ -376,8 +384,8 @@ function normalizeQuickLink(item) {
   if (!label || !address) throw new Error('每个快捷链接都需要名称和完整地址');
   let url;
   try { url = new URL(address); } catch { throw new Error(`“${label}”的地址无效`); }
-  if (url.protocol !== 'https:' || url.hostname !== 'e-hentai.org' || url.username || url.password || url.hash || (url.port && url.port !== '443')) {
-    throw new Error(`“${label}”只能使用 https://e-hentai.org/ 下的地址`);
+  if (url.protocol !== 'https:' || !sourceHosts.includes(url.hostname) || url.username || url.password || url.hash || (url.port && url.port !== '443')) {
+    throw new Error(`“${label}”只能使用 E-Hentai 或 ExHentai 的 HTTPS 地址`);
   }
   return { label, url: url.href };
 }
@@ -519,10 +527,15 @@ async function resetSettings() {
 
 async function runSearch(url, targetIndex = null) {
   const version = ++searchVersion;
+  const target = sourceUrl(url, preferences.useEx);
   error.value = '';
   result.value = null;
   rawResponse.value = '';
-  requestUrl.value = url;
+  requestUrl.value = target;
+  if (!target) {
+    error.value = '请求地址无效';
+    return;
+  }
   if (!cookieConfigured.value) {
     error.value = '请先在配置菜单中保存 Cookie。';
     return;
@@ -532,13 +545,14 @@ async function runSearch(url, targetIndex = null) {
     const response = await fetch('/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, userAgent: navigator.userAgent, extended: true }),
+      body: JSON.stringify({ url: target, userAgent: navigator.userAgent, extended: true }),
     });
     const data = await response.json();
+    if (version !== searchVersion) return;
     if (!response.ok) throw new Error(data.error || '本地请求失败');
     rawResponse.value = typeof data.body === 'string' ? data.body : '';
     if (data.status !== 200) throw new Error(`目标站点返回 HTTP ${data.status} ${data.reason || ''}。可在下方查看原始 HTML。`);
-    const parsed = parseGallery(data.body, url);
+    const parsed = parseGallery(data.body, target);
     if (!parsed.hasTable) throw new Error('响应中没有 Extended 结果表格，可在下方查看原始 HTML。');
     result.value = parsed;
     if (!parsed.pages.prev || !pageSize.value) pageSize.value = parsed.items.length;
@@ -547,9 +561,9 @@ async function runSearch(url, targetIndex = null) {
     rawResponse.value = '';
     void enrichPostedTimes(parsed, version);
   } catch (failure) {
-    error.value = failure.message || '请求失败';
+    if (version === searchVersion) error.value = failure.message || '请求失败';
   } finally {
-    loading.value = false;
+    if (version === searchVersion) loading.value = false;
   }
 }
 
@@ -559,7 +573,7 @@ function submitSearch() {
   tagPopover.value = null;
   activeQuickLink.value = '';
   try {
-    const url = buildSearchUrl(searchText.value, filters);
+    const url = buildSearchUrl(searchText.value, filters, preferences.useEx);
     pageSize.value = 0;
     runSearch(url, 0);
   } catch (failure) {
@@ -602,7 +616,7 @@ onMounted(async () => {
       }
       if (typeof saved.requestUrl === 'string') {
         const url = new URL(saved.requestUrl);
-        if (url.protocol === 'https:' && url.hostname === 'e-hentai.org' &&
+        if (url.protocol === 'https:' && sourceHosts.includes(url.hostname) &&
             (!url.port || url.port === '443') && !url.username && !url.password && !url.hash) requestUrl.value = url.href;
       }
       if (typeof saved.activeQuickLink === 'string') activeQuickLink.value = saved.activeQuickLink;
@@ -619,12 +633,13 @@ onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
-      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap']) {
+      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap', 'useEx']) {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
       if ([10, 20, 40, 60].includes(Number(saved.immersivePreloadCount))) preferences.immersivePreloadCount = Number(saved.immersivePreloadCount);
       if ([0, 5, 10, 20].includes(Number(saved.immersivePreloadBeforeCount))) preferences.immersivePreloadBeforeCount = Number(saved.immersivePreloadBeforeCount);
+      preferences.loadingStyle = normalizeLoadingStyle(saved.loadingStyle);
     }
   } catch { /* Keep default preferences when storage is unavailable. */ }
   preferencesReady = true;
@@ -634,16 +649,16 @@ onMounted(async () => {
   if (linkedUploader) {
     try {
       const url = new URL(linkedUploader);
-      if (url.protocol === 'https:' && url.hostname === 'e-hentai.org' && /^\/uploader\/[^/]+\/?$/i.test(url.pathname) &&
+      if (url.protocol === 'https:' && sourceHosts.includes(url.hostname) && /^\/uploader\/[^/]+\/?$/i.test(url.pathname) &&
           (!url.port || url.port === '443') && !url.username && !url.password && !url.hash) {
-        requestUrl.value = url.href;
+        requestUrl.value = sourceUrl(url.href, preferences.useEx);
         pageIndex.value = 0;
       }
     } catch { /* Ignore invalid uploader links. */
     }
   }
   await loadConfig();
-  void runSearch(requestUrl.value || defaultGalleryUrl, pageIndex.value);
+  void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, pageIndex.value);
   if (currentUrl.searchParams.get('settings') === '1') {
     openSettings();
     currentUrl.searchParams.delete('settings');
@@ -677,8 +692,8 @@ onUnmounted(() => {
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
-        <a href="/" aria-current="page">主页</a>
-        <a href="/debug"><UiIcon name="external" :size="15" /> 调试页面</a>
+        <a href="/" aria-current="page"><UiIcon name="home" :size="15" /> 主页</a>
+        <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
     </header>
@@ -757,7 +772,7 @@ onUnmounted(() => {
         </div>
 
         <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>暂时无法展示结果</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><a href="/debug"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
-        <div v-else-if="loading" class="message loading-message" role="status"><span class="spinner"></span><strong>正在获取并解析图库…</strong><p class="request-address">{{ requestUrl }}</p></div>
+        <div v-else-if="loading" class="message loading-message" role="status"><LoadingIndicator :variant="preferences.loadingStyle"/><strong>正在获取并解析图库…</strong><p class="request-address">{{ requestUrl }}</p></div>
         <div v-else-if="!result" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>从一次搜索开始</strong><p>输入关键词，按需调整高级筛选，结果会显示在这里。</p></div>
         <template v-else>
           <div v-if="!result.items.length" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>没有找到匹配的图库</strong><p>换个关键词或放宽筛选条件试试。</p></div>
@@ -820,7 +835,18 @@ onUnmounted(() => {
       </aside>
     </Teleport>
 
-    <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">作者主页 <UiIcon name="external" :size="13" /></a></nav></footer>
+    <footer class="site-footer">
+      <span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span>
+      <nav class="footer-links" aria-label="页脚导航">
+        <a href="/development-log">
+          <UiIcon name="book" :size="13" style="margin-right:4px"/> 开发日志
+        </a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">
+          <UiIcon name="blog" :size="13" style="margin-right:4px"/> 作者主页
+        </a>
+      </nav>
+    </footer>
 
     <TorrentDialog ref="torrentDialog"/>
 
@@ -833,6 +859,8 @@ onUnmounted(() => {
             <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
             <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
           </div>
+          <div class="loading-style-setting"><label for="loading-style">加载动画</label><select id="loading-style" v-model="preferences.loadingStyle"><option v-for="option in loadingStyleOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
+          <label class="source-site-setting"><input v-model="preferences.useEx" type="checkbox"/> 启用 EX（ExHentai）</label>
           <h3>沉浸式浏览</h3>
           <div class="immersive-cache-settings"><label><input v-model="preferences.immersiveSaveProgress" type="checkbox"/> 保存浏览进度</label><label><input v-model="preferences.immersiveImageSnap" type="checkbox"/> 图片吸附</label><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向后预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select><label for="immersive-preload-before-count">向前预载入</label><select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></div>
           <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button class="settings-action-button" type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>

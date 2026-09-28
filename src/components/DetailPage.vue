@@ -6,10 +6,14 @@ import ImmersiveReader from './ImmersiveReader.vue';
 import GalleryDownloadDialog from './GalleryDownloadDialog.vue';
 import TorrentDialog from './TorrentDialog.vue';
 import UiIcon from './UiIcon.vue';
+import LoadingIndicator from './LoadingIndicator.vue';
+import {readLoadingStyle} from '../lib/loadingStyle.js';
+import {readExEnabled, sourceUrl} from '../lib/sourceSite.js';
 
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
 const data = ref(null);
 const loading = ref(true);
+const loadingStyle = ref(readLoadingStyle());
 const error = ref('');
 const source = ref('');
 const translations = ref({});
@@ -102,9 +106,10 @@ function pageUrl(base, index) {
 }
 
 async function fetchSource(url, signal) {
+  const target = sourceUrl(url);
   const response = await fetch('/fetch', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({url, userAgent: navigator.userAgent, extended: true}),
+    body: JSON.stringify({url: target, userAgent: navigator.userAgent, extended: true}),
     signal,
   });
   const result = await response.json();
@@ -114,6 +119,7 @@ async function fetchSource(url, signal) {
 }
 
 async function load() {
+  loadingStyle.value = readLoadingStyle();
   const version = ++requestVersion;
   const params = new URLSearchParams(window.location.search);
   const target = kind === 'gallery' ? galleryLink(params.get('url')) : imageLink(params.get('url'));
@@ -128,7 +134,7 @@ async function load() {
   loading.value = true;
   try {
     if (kind === 'image') {
-      const parsed = parseImageDetail(await fetchSource(target));
+      const parsed = parseImageDetail(await fetchSource(target), target);
       if (version === requestVersion) {
         data.value = parsed;
         document.title = `${parsed.title} · Gallery Lens`;
@@ -211,7 +217,7 @@ function galleryPageHref(index) {
 }
 
 function imageDownloadHref(url, variant, number = data.value.number) {
-  return `/api/image-download?${new URLSearchParams({url, page: String(number), variant})}`;
+  return `/api/image-download?${new URLSearchParams({url, page: String(number), variant, site: readExEnabled() ? 'exhentai.org' : 'e-hentai.org'})}`;
 }
 
 async function downloadCatalogImage(item, variant) {
@@ -219,7 +225,7 @@ async function downloadCatalogImage(item, variant) {
   catalogDownloadPending.value[item.number] = true;
   catalogDownloadErrors.value[item.number] = '';
   try {
-    const detail = parseImageDetail(await fetchSource(item.url));
+    const detail = parseImageDetail(await fetchSource(item.url), item.url);
     const url = variant === 'original' ? detail.original : detail.image;
     if (!url) throw new Error(variant === 'original' ? '此页未提供原图下载地址' : '此页未提供低保真图下载地址');
     const link = document.createElement('a');
@@ -306,10 +312,10 @@ onUnmounted(() => {
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
     <header class="site-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-      <nav class="header-actions" aria-label="页面导航"><a href="/">主页</a><a href="/debug"><UiIcon name="external" :size="15"/> 调试页面</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
+      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
-      <div v-if="loading" class="detail-state" role="status"><span class="spinner"></span>
+      <div v-if="loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>
         <h1>正在整理{{ kind === 'gallery' ? '画廊' : '图片' }}内容…</h1></div>
       <div v-else-if="error" class="detail-state" role="alert"><h1>无法显示详情</h1>
         <p>{{ error }}</p><a href="/">返回搜索页</a></div>

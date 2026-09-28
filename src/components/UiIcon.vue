@@ -7,9 +7,12 @@ defineProps({
 
 <template>
   <svg :width="size" :height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-    <template v-if="name === 'search'"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></template>
+    <template v-if="name === 'home'"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-7h6v7"/></template>
+    <template v-else-if="name === 'terminal'"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m5 0h5"/></template>
+    <template v-else-if="name === 'search'"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></template>
     <template v-else-if="name === 'settings'"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></template>
     <template v-else-if="name === 'external'"><path d="M13 5h6v6M19 5l-9 9"/><path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/></template>
+    <template v-else-if="name === 'blog'"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></template>
     <template v-else-if="name === 'grid'"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></template>
     <template v-else-if="name === 'list'"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".7" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r=".7" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r=".7" fill="currentColor" stroke="none"/></template>
     <template v-else-if="name === 'rows'"><path d="M4 5h16v4H4zM4 15h16v4H4z"/></template>

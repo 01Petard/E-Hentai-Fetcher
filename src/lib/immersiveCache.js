@@ -1,3 +1,5 @@
+import {readExEnabled} from './sourceSite.js';
+
 const entries = new Map();
 const listeners = new Set();
 
@@ -51,7 +53,7 @@ export async function preloadImmersiveImage(number, url) {
   if (existing) return existing.promise;
   const controller = new AbortController();
   const entry = {controller, objectUrl: '', promise: null};
-  const params = new URLSearchParams({url, page: String(number), variant: 'preview'});
+  const params = new URLSearchParams({url, page: String(number), variant: 'preview', site: readExEnabled() ? 'exhentai.org' : 'e-hentai.org'});
   entry.promise = fetch(`/api/image-download?${params}`, {signal: controller.signal, priority: 'low'}).then(async response => {
     if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) throw new Error('预载入图片失败');
     const blob = await response.blob();

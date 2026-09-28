@@ -1,3 +1,5 @@
+import {readExEnabled} from './sourceSite.js';
+
 const imageExtensions = {
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
   'image/gif': 'gif', 'image/avif': 'avif', 'image/bmp': 'bmp',
@@ -62,7 +64,7 @@ async function retry(operation, signal, onAttempt) {
 }
 
 export async function fetchImageBlob(url, number, variant, signal) {
-  const params = new URLSearchParams({url, page: String(number), variant});
+  const params = new URLSearchParams({url, page: String(number), variant, site: readExEnabled() ? 'exhentai.org' : 'e-hentai.org'});
   const response = await fetch(`/api/image-download?${params}`, {signal});
   const mime = response.headers.get('content-type')?.split(';', 1)[0].toLowerCase();
   if (!response.ok || !imageExtensions[mime]) throw new Error(`${variant === 'original' ? '原图' : '展示图'}下载失败`);
@@ -74,7 +76,7 @@ export async function fetchImageBlob(url, number, variant, signal) {
 export async function downloadGalleryImage(item, mode, deps) {
   const {fetchSource, parseImageDetail, fetchBinary = fetchImageBlob, signal, onAttempt} = deps;
   const html = await retry(() => fetchSource(item.url, signal), signal, attempt => onAttempt?.('page', attempt));
-  const detail = parseImageDetail(html);
+  const detail = parseImageDetail(html, item.url);
   if (mode !== 'preferred' && mode !== 'original') throw new Error('图片策略无效');
   if (!detail.original && mode === 'original') throw new Error('源站未提供原图');
   if (detail.original) {

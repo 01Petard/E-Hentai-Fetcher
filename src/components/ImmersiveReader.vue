@@ -3,6 +3,8 @@ import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {cachedImmersiveImage, cancelPendingImmersiveImages, clearImmersiveCache, getImmersiveCacheStats, immersivePreloadWindow, preloadImmersiveImage, subscribeImmersiveCache} from '../lib/immersiveCache.js';
 import {readImmersiveProgress, saveImmersiveProgress} from '../lib/immersiveProgress.js';
+import {readLoadingStyle} from '../lib/loadingStyle.js';
+import LoadingIndicator from './LoadingIndicator.vue';
 
 const props = defineProps({gallery: {type: Object, required: true}, fetchSource: {type: Function, required: true}});
 const emit = defineEmits(['close']);
@@ -10,6 +12,7 @@ const dialog = ref(null);
 const first = ref(1);
 const pages = ref([]);
 const pending = ref(false);
+const loadingStyle = readLoadingStyle();
 const error = ref('');
 const fullscreen = ref(false);
 const controlsVisible = ref(true);
@@ -60,7 +63,7 @@ async function imageAt(number) {
       || (await sourcePages.get(sourceIndex)).find(item => item.number === number);
   if (!image) throw new Error(`找不到第 ${number} 页的图片地址`);
   if (!imagePages.has(number)) {
-    imagePages.set(number, props.fetchSource(image.url).then(html => parseImageDetail(html)).catch(failure => {
+    imagePages.set(number, props.fetchSource(image.url).then(html => parseImageDetail(html, image.url)).catch(failure => {
       imagePages.delete(number);
       throw failure;
     }));
@@ -327,7 +330,7 @@ onUnmounted(() => {
               <img :src="page.displayUrl" :alt="`第 ${first + slot} 页`" referrerpolicy="no-referrer" fetchpriority="high"/>
               <span class="immersive-page-number">{{ first + slot }} / {{ total }}</span>
             </div>
-            <span v-if="pending && !pages.length" class="immersive-page-state">正在加载…</span>
+            <div v-if="pending && !pages.length" class="immersive-page-state" role="status"><LoadingIndicator :variant="loadingStyle" dark/>正在加载…</div>
           </div>
           <button class="immersive-turn" type="button" aria-label="向右翻页" :disabled="first + pageCount > total" :inert="fullscreen && !controlsVisible" @click="nextPage">›</button>
         </div>

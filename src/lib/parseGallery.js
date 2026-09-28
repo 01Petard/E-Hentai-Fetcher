@@ -1,8 +1,13 @@
+import {sourceHosts} from './sourceSite.js';
+
 function safeUrl(value, hosts, baseUrl) {
   if (!value) return '';
   try {
     const url = new URL(value, baseUrl);
-    return url.protocol === 'https:' && hosts.includes(url.hostname) ? url.href : '';
+    if (url.protocol !== 'https:' || !hosts.includes(url.hostname) || url.username || url.password ||
+        (url.port && url.port !== '443') || url.hash) return '';
+    if (sourceHosts.includes(url.hostname)) url.hostname = new URL(baseUrl).hostname;
+    return url.href;
   } catch {
     return '';
   }
@@ -44,7 +49,7 @@ export function parseGallery(html, requestUrl) {
   const pages = {};
   for (const [key, id] of Object.entries({ first: 'ufirst', prev: 'uprev', next: 'unext', last: 'ulast' })) {
     const anchor = nav?.querySelector(`a#${id}`);
-    pages[key] = safeUrl(anchor?.getAttribute('href'), ['e-hentai.org'], requestUrl);
+    pages[key] = safeUrl(anchor?.getAttribute('href'), sourceHosts, requestUrl);
   }
   const table = document.querySelector('table.itg.glte');
   if (!table) return { items: [], total, approximate, pages, hasTable: false };
@@ -73,16 +78,16 @@ export function parseGallery(html, requestUrl) {
     })).filter(group => group.values.length);
     items.push({
       title: titleNode.textContent.trim(),
-      url: safeUrl(titleNode.closest('a')?.getAttribute('href'), ['e-hentai.org'], requestUrl),
-      image: safeUrl(coverCell.querySelector('img')?.getAttribute('data-src') || coverCell.querySelector('img')?.getAttribute('src'), ['ehgt.org', 'e-hentai.org'], requestUrl),
+      url: safeUrl(titleNode.closest('a')?.getAttribute('href'), sourceHosts, requestUrl),
+      image: safeUrl(coverCell.querySelector('img')?.getAttribute('data-src') || coverCell.querySelector('img')?.getAttribute('src'), ['ehgt.org', ...sourceHosts], requestUrl),
       category: metadata?.querySelector('.cn')?.textContent.trim() || '未分类',
       ratingPosition: /^-?\d+px\s+-?\d+px$/.test(ratingPosition) ? ratingPosition : '',
       ratingSprite,
       published,
       pages: [...(metadata?.children || [])].find(node => /\bpages?\b/i.test(node.textContent.trim()))?.textContent.trim() || '',
       uploader: uploader?.textContent.trim() || '',
-      uploaderUrl: safeUrl(uploader?.getAttribute('href'), ['e-hentai.org'], requestUrl),
-      torrentUrl: safeUrl(metadata?.querySelector('.gldown a')?.getAttribute('href'), ['e-hentai.org'], requestUrl),
+      uploaderUrl: safeUrl(uploader?.getAttribute('href'), sourceHosts, requestUrl),
+      torrentUrl: safeUrl(metadata?.querySelector('.gldown a')?.getAttribute('href'), sourceHosts, requestUrl),
       tagGroups,
     });
   }

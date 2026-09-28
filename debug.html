@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#f5f5f1"/>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <link rel="stylesheet" href="/src/styles/loadingIndicator.css"/>
   <title>响应调试 · Gallery Lens</title>
   <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
@@ -90,6 +91,7 @@
           margin-top: 20px;
           font-weight: 650;
       }
+      .debug-request-card .loading-indicator { margin: 12px 0 0; }
 
       .display-option {
           display: flex;
@@ -236,7 +238,7 @@
       .settings-dot { width: 7px; height: 7px; border-radius: 50%; background: #c8cec9; }
       .settings-dot.active { background: #4d9f78; box-shadow: 0 0 0 3px #4d9f7820; }
       .site-footer { height: 70px; padding: 0 max(24px, calc((100vw - 1260px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid #e2e6df; color: #9aa89d; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
-      .site-footer a { color: inherit; font-size: 11px; letter-spacing: 0; text-decoration: none; }
+      .site-footer a { display: inline-flex; align-items: center; gap: 4px; color: inherit; font-size: 11px; letter-spacing: 0; text-decoration: none; }
       .footer-dot { color: #c77459; }
       .debug-main { width: min(1260px, 100%); margin: 0 auto; padding: 16px 24px 56px; flex: 1; background: none; border: 0; border-radius: 0; box-shadow: none; }
       .debug-request-card { padding: 18px 24px; border: 1px solid #dce7dc; border-radius: 14px; background: #e9f0e9; }
@@ -287,7 +289,7 @@
 <div class="debug-shell">
   <header class="site-header">
     <a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-    <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/">主页</a><a href="/debug" aria-current="page"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5h6v6M19 5l-9 9"/><path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/></svg> 调试页面</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
+    <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-7h6v7"/></svg> 主页</a><a href="/debug" aria-current="page"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m5 0h5"/></svg> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
   </header>
 <main class="debug-main">
   <section class="debug-request-card" aria-labelledby="debug-title">
@@ -306,6 +308,7 @@
   <p class="option-note">勾选后仅本次请求将显示模式 Cookie 设为 <code>sl=dm_2</code>。</p>
 
   <div id="summary" role="status" aria-live="polite">尚未发送请求</div>
+  <div id="debug-loader" class="loading-indicator" aria-hidden="true" hidden></div>
   </section>
   <section class="result-section" aria-labelledby="response-heading">
     <div class="section-heading"><h2 id="response-heading">原始响应</h2><span id="response-meta"></span></div>
@@ -324,7 +327,7 @@
     <div id="gallery" class="gallery-list" aria-live="polite"><p class="empty-result">请求完成后展示 .itg.glte 表格的内容。</p></div>
   </section>
 </main>
-<footer class="site-footer"><span>GALLERY LENS <span class="footer-dot">·</span> LOCAL TOOL</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">作者主页 ↗</a></footer>
+<footer class="site-footer"><span>GALLERY LENS <span class="footer-dot">·</span> LOCAL TOOL</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>作者主页</a></footer>
 </div>
 <template id="gallery-template">
   <article class="gallery-entry">
@@ -335,12 +338,17 @@
     <div class="entry-tags"></div>
   </article>
 </template>
-<script>
+<script type="module">
+    import {readLoadingStyle} from '/src/lib/loadingStyle.js';
+    import {sourceHosts, sourceUrl} from '/src/lib/sourceSite.js';
+
     const urlInput = document.querySelector("#url");
+    urlInput.value = sourceUrl(urlInput.value);
     const cookieInput = document.querySelector("#cookie");
     const sendButton = document.querySelector("#send");
     const extendedInput = document.querySelector("#extended");
     const summary = document.querySelector("#summary");
+    const debugLoader = document.querySelector("#debug-loader");
     const output = document.querySelector("#output");
     const responseMeta = document.querySelector("#response-meta");
     const galleryMeta = document.querySelector("#gallery-meta");
@@ -374,7 +382,10 @@
         if (!value) return null;
         try {
             const parsed = new URL(value, baseUrl);
-            return parsed.protocol === "https:" && allowedHosts.includes(parsed.hostname) ? parsed.href : null;
+            if (parsed.protocol !== "https:" || !allowedHosts.includes(parsed.hostname) || parsed.username || parsed.password ||
+                (parsed.port && parsed.port !== "443") || parsed.hash) return null;
+            if (sourceHosts.includes(parsed.hostname)) parsed.hostname = new URL(baseUrl).hostname;
+            return parsed.href;
         } catch {
             return null;
         }
@@ -390,6 +401,7 @@
     sendButton.addEventListener("click", () => loadPage(urlInput.value.trim()));
 
     async function loadPage(url) {
+        url = sourceUrl(url) || url;
         const cookie = cookieInput.value.trim();
         urlInput.value = url;
         sendButton.disabled = true;
@@ -398,6 +410,15 @@
             delete button.dataset.url;
         }
         summary.textContent = "请求中…";
+        const loadingStyle = readLoadingStyle();
+        debugLoader.className = `loading-indicator loading-indicator--${loadingStyle}`;
+        debugLoader.innerHTML = {
+            spinner: '<span class="spinner"></span>',
+            skeleton: '<span class="loading-skeleton-cover"></span><span class="loading-skeleton-lines"><span></span><span></span><span></span></span>',
+            progress: '<span class="loading-progress-track"><span></span></span>',
+            dots: '<span class="loading-dots"><span></span><span></span><span></span></span>',
+        }[loadingStyle];
+        debugLoader.hidden = false;
         output.textContent = "";
         responseMeta.textContent = "";
         galleryMeta.textContent = "";
@@ -430,7 +451,7 @@
             for (const button of paginationButtons) {
                 const sourceLink = sourceNav?.querySelector(`[id$="${button.dataset.page}"]`);
                 const targetUrl = sourceLink?.tagName === "A"
-                    ? safeUrl(sourceLink.getAttribute("href"), ["e-hentai.org"], url)
+                    ? safeUrl(sourceLink.getAttribute("href"), sourceHosts, url)
                     : null;
                 button.disabled = !targetUrl;
                 if (targetUrl) button.dataset.url = targetUrl;
@@ -457,7 +478,7 @@
                 const titleNode = detailCell.querySelector(".gl4e .glink");
                 if (!titleNode) continue;
                 const item = galleryTemplate.content.firstElementChild.cloneNode(true);
-                const galleryUrl = safeUrl(titleNode.closest("a")?.getAttribute("href"), ["e-hentai.org"], url);
+                const galleryUrl = safeUrl(titleNode.closest("a")?.getAttribute("href"), sourceHosts, url);
                 const titleLink = item.querySelector(".entry-title");
                 titleLink.textContent = titleNode.textContent.trim();
                 if (galleryUrl) titleLink.href = galleryUrl;
@@ -465,7 +486,7 @@
 
                 const cover = item.querySelector(".entry-cover");
                 const image = coverCell.querySelector("img");
-                const imageUrl = safeUrl(image?.getAttribute("data-src") || image?.getAttribute("src"), ["ehgt.org", "e-hentai.org"], url);
+                const imageUrl = safeUrl(image?.getAttribute("data-src") || image?.getAttribute("src"), ["ehgt.org", ...sourceHosts], url);
                 if (galleryUrl) cover.href = galleryUrl;
                 else cover.removeAttribute("href");
                 if (imageUrl) {
@@ -502,14 +523,14 @@
                     .find(node => /\bpages?\b/i.test(node.textContent.trim()))?.textContent.trim() || "";
                 const uploaderNode = metadata?.querySelector('a[href*="/uploader/"]');
                 const uploader = item.querySelector(".entry-uploader");
-                const uploaderUrl = safeUrl(uploaderNode?.getAttribute("href"), ["e-hentai.org"], url);
+                const uploaderUrl = safeUrl(uploaderNode?.getAttribute("href"), sourceHosts, url);
                 if (uploaderUrl) {
                     uploader.href = uploaderUrl;
                     uploader.textContent = `上传者：${uploaderNode.textContent.trim()}`;
                 } else uploader.remove();
                 const torrentNode = metadata?.querySelector(".gldown a");
                 const torrent = item.querySelector(".entry-torrent");
-                const torrentUrl = safeUrl(torrentNode?.getAttribute("href"), ["e-hentai.org"], url);
+                const torrentUrl = safeUrl(torrentNode?.getAttribute("href"), sourceHosts, url);
                 if (torrentUrl) torrent.href = torrentUrl;
                 else torrent.replaceWith(Object.assign(document.createElement("span"), {textContent: "无种子"}));
 
@@ -543,6 +564,7 @@
             output.textContent = `${error.name}: ${error.message}\n\n请确认页面地址是 http://127.0.0.1:8765/debug，并且 npm run dev 仍在运行。`;
             gallery.innerHTML = '<p class="empty-result">解析失败，请查看原始响应框中的错误信息。</p>';
         } finally {
+            debugLoader.hidden = true;
             sendButton.disabled = false;
         }
     }

@@ -1,0 +1,60 @@
+.loading-indicator {
+    --loading-accent: #c77459;
+    --loading-base: #d4e1d6;
+    --loading-highlight: #edf3ed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 180px;
+    min-height: 24px;
+    margin: 0 auto 16px
+}
+
+.loading-indicator[hidden] { display: none }
+
+.loading-indicator--dark {
+    --loading-accent: #8db9ff;
+    --loading-base: #475469;
+    --loading-highlight: #68768c
+}
+
+.loading-indicator--spinner { width: 24px }
+.loading-indicator .spinner {
+    display: block;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    border: 3px solid var(--loading-base);
+    border-top-color: var(--loading-accent);
+    border-radius: 50%;
+    animation: loading-spin .8s linear infinite
+}
+
+.loading-indicator--skeleton { width: 200px; gap: 10px }
+.loading-skeleton-cover { flex: none; width: 48px; height: 48px; border-radius: 5px }
+.loading-skeleton-lines { display: grid; flex: 1; gap: 6px }
+.loading-skeleton-lines span { display: block; height: 8px; border-radius: 4px }
+.loading-skeleton-lines span:last-child { width: 66% }
+.loading-skeleton-cover, .loading-skeleton-lines span {
+    background: linear-gradient(90deg, var(--loading-base) 20%, var(--loading-highlight) 50%, var(--loading-base) 80%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.4s ease-in-out infinite
+}
+
+.loading-progress-track { display: block; width: 100%; height: 7px; overflow: hidden; border-radius: 99px; background: var(--loading-base) }
+.loading-progress-track span { display: block; width: 32%; height: 100%; border-radius: inherit; background: var(--loading-accent); animation: loading-slide 1.3s ease-in-out infinite }
+
+.loading-indicator--dots { width: 60px }
+.loading-dots { display: flex; gap: 7px }
+.loading-dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--loading-accent); animation: loading-pulse 1s ease-in-out infinite }
+.loading-dots span:nth-child(2) { animation-delay: .15s }
+.loading-dots span:nth-child(3) { animation-delay: .3s }
+
+@keyframes loading-spin { to { transform: rotate(360deg) } }
+@keyframes loading-shimmer { to { background-position-x: -200% } }
+@keyframes loading-slide { from { transform: translateX(-110%) } to { transform: translateX(330%) } }
+@keyframes loading-pulse { 0%, 70%, 100% { opacity: .35; transform: scale(.72) } 35% { opacity: 1; transform: scale(1) } }
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-indicator *, .loading-indicator .spinner { animation: none }
+}

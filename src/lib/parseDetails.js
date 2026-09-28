@@ -1,15 +1,15 @@
-function sourceUrl(value, path) {
-    try {
-        const url = new URL(value, 'https://e-hentai.org');
-        return url.protocol === 'https:' && url.hostname === 'e-hentai.org' && path.test(url.pathname) ? url.href : '';
-    } catch {
-        return '';
-    }
+import {readExEnabled, sourceOrigin, sourceUrl} from './sourceSite.js';
+
+function detailSourceUrl(value, path, base = sourceOrigin(readExEnabled())) {
+    const url = sourceUrl(value, new URL(base).hostname === 'exhentai.org', base);
+    return url && path.test(new URL(url).pathname) ? url : '';
 }
 
-function imageUrl(value) {
+function imageUrl(value, base) {
+    if (!value) return '';
     try {
-        const url = new URL(value);
+        const url = new URL(value, base);
+        if (['e-hentai.org', 'exhentai.org'].includes(url.hostname)) url.hostname = new URL(base).hostname;
         return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
     } catch {
         return '';
@@ -29,16 +29,16 @@ function translationKey(value) {
     return prefix ? `${prefix}:${parts.join(':').trim()}` : parts.join(':').trim();
 }
 
-export function galleryLink(value) {
-    return sourceUrl(value, /^\/g\/\d+\/[a-f0-9]+\/?$/i);
+export function galleryLink(value, base) {
+    return detailSourceUrl(value, /^\/g\/\d+\/[a-f0-9]+\/?$/i, base);
 }
 
-export function imageLink(value) {
-    return sourceUrl(value, /^\/s\/[a-f0-9]+\/\d+-\d+\/?$/i);
+export function imageLink(value, base) {
+    return detailSourceUrl(value, /^\/s\/[a-f0-9]+\/\d+-\d+\/?$/i, base);
 }
 
-export function uploaderLink(value) {
-    return sourceUrl(value, /^\/uploader\/[^/]+\/?$/i);
+export function uploaderLink(value, base) {
+    return detailSourceUrl(value, /^\/uploader\/[^/]+\/?$/i, base);
 }
 
 export function localGalleryUrl(url) {
@@ -54,16 +54,16 @@ export function parseGalleryDetail(html, requestUrl) {
     const title = doc.querySelector('#gn')?.textContent.trim();
     if (!title || !doc.querySelector('#gdd')) throw new Error('响应中没有画廊详情内容');
     const coverStyle = doc.querySelector('#gd1 div')?.style.backgroundImage || '';
-    const cover = imageUrl(/url\(["']?([^"')]+)/.exec(coverStyle)?.[1]);
+    const cover = imageUrl(/url\(["']?([^"')]+)/.exec(coverStyle)?.[1], requestUrl);
     const metadata = [...doc.querySelectorAll('#gdd tr')].map(row => ({
         label: row.querySelector('.gdt1')?.textContent.trim().replace(/:$/, '') || '',
         value: row.querySelector('.gdt2')?.textContent.trim() || '',
-        url: galleryLink(row.querySelector('.gdt2 a')?.href),
+        url: galleryLink(row.querySelector('.gdt2 a')?.getAttribute('href'), requestUrl),
     })).filter(row => row.label && row.value);
     const rating = doc.querySelector('#rating_label')?.textContent.trim().replace(/^Average:\s*/i, '') || '';
     const torrentAnchor = doc.querySelector('#gd5 a[onclick*="gallerytorrents.php"], #gd5 a[href*="gallerytorrents.php"]');
-    const torrentUrl = sourceUrl(/https:\/\/e-hentai\.org\/gallerytorrents\.php\?gid=\d+&t=[a-f0-9]+/i.exec(
-        torrentAnchor?.getAttribute('onclick') || torrentAnchor?.href || '')?.[0], /^\/gallerytorrents\.php$/);
+    const torrentUrl = detailSourceUrl(/https:\/\/(?:e-hentai|exhentai)\.org\/gallerytorrents\.php\?gid=\d+&t=[a-f0-9]+/i.exec(
+        torrentAnchor?.getAttribute('onclick') || torrentAnchor?.href || '')?.[0], /^\/gallerytorrents\.php$/, requestUrl);
     const tags = [...doc.querySelectorAll('#taglist tr')].map(row => ({
         label: row.querySelector('.tc')?.textContent.trim().replace(/:$/, '') || '',
         values: [...row.querySelectorAll('.gt, .gtl')].map(node => ({
@@ -74,10 +74,10 @@ export function parseGalleryDetail(html, requestUrl) {
     const images = [...doc.querySelectorAll('#gdt > a')].map(anchor => {
         const cell = anchor.querySelector('div');
         const style = cell?.style;
-        const src = imageUrl(/url\(["']?([^"')]+)/.exec(style?.backgroundImage || '')?.[1]);
+        const src = imageUrl(/url\(["']?([^"')]+)/.exec(style?.backgroundImage || '')?.[1], requestUrl);
         const number = Number(/\/\d+-(\d+)\/?$/.exec(anchor.href)?.[1]);
         return {
-            url: imageLink(anchor.href), number, name: cell?.title.replace(/^Page \d+:\s*/, '') || '',
+            url: imageLink(anchor.getAttribute('href'), requestUrl), number, name: cell?.title.replace(/^Page \d+:\s*/, '') || '',
             sprite: src, position: style?.backgroundPosition || '0 0',
             width: style?.width || '200px', height: style?.height || '280px',
         };
@@ -104,22 +104,22 @@ export function parseGalleryDetail(html, requestUrl) {
         title, japaneseTitle: doc.querySelector('#gj')?.textContent.trim() || '', cover,
         category: doc.querySelector('#gdc .cs')?.textContent.trim() || '',
         uploader: doc.querySelector('#gdn a')?.textContent.trim() || '',
-        uploaderUrl: uploaderLink(doc.querySelector('#gdn a')?.href),
+        uploaderUrl: uploaderLink(doc.querySelector('#gdn a')?.getAttribute('href'), requestUrl),
         metadata, rating, torrentUrl, tags, images, comments,
         imageRange: rangeText, totalImages,
         sourcePageSize,
         sourcePageCount: Math.max(...sourcePageNumbers, sourcePageSize ? Math.ceil(totalImages / sourcePageSize) : 1),
-        source: galleryLink(requestUrl),
+        source: galleryLink(requestUrl, requestUrl),
     };
 }
 
-export function parseImageDetail(html) {
+export function parseImageDetail(html, requestUrl = sourceOrigin(readExEnabled())) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const imageNode = doc.querySelector('#img');
-    const image = imageUrl(imageNode?.getAttribute('src'));
+    const image = imageUrl(imageNode?.getAttribute('src'), requestUrl);
     if (!image) throw new Error('响应中没有单页图片');
     const originalNode = doc.querySelector('a[href*="fullimg"]');
-    const original = imageUrl(originalNode?.href);
+    const original = imageUrl(originalNode?.getAttribute('href'), requestUrl);
     const originalText = originalNode?.textContent || '';
     const imageInfo = doc.querySelector('#i4 > div')?.textContent || '';
     const originalDimensions = /([\d,]+)\s*x\s*([\d,]+)/i.exec(originalText) || /([\d,]+)\s*x\s*([\d,]+)/i.exec(imageInfo);
@@ -136,8 +136,8 @@ export function parseImageDetail(html) {
         image, original,
         originalResolution: originalDimensions ? `${originalDimensions[1]} × ${originalDimensions[2]}` : '', originalSize,
         width, height, number: numbers[0] || 1, total: numbers[1] || 0,
-        prev: numbers[0] > 1 ? imageLink(doc.querySelector('#i2 #prev')?.href) : '',
-        next: numbers[1] && numbers[0] >= numbers[1] ? '' : imageLink(doc.querySelector('#i2 #next')?.href),
-        gallery: galleryLink(doc.querySelector('#i5 a[href*="/g/"]')?.href),
+        prev: numbers[0] > 1 ? imageLink(doc.querySelector('#i2 #prev')?.getAttribute('href'), requestUrl) : '',
+        next: numbers[1] && numbers[0] >= numbers[1] ? '' : imageLink(doc.querySelector('#i2 #next')?.getAttribute('href'), requestUrl),
+        gallery: galleryLink(doc.querySelector('#i5 a[href*="/g/"]')?.getAttribute('href'), requestUrl),
     };
 }
