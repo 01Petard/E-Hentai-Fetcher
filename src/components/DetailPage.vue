@@ -3,6 +3,7 @@ import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {galleryLink, imageLink, localGalleryUrl, localImageUrl, parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {readTagCache, refreshTagTranslations} from '../lib/tagTranslations.js';
 import ImmersiveReader from './ImmersiveReader.vue';
+import TorrentDialog from './TorrentDialog.vue';
 import UiIcon from './UiIcon.vue';
 
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
@@ -20,6 +21,7 @@ const jumpValue = ref('');
 const jumpError = ref('');
 const jumpInput = ref(null);
 const immersiveOpen = ref(false);
+const torrentDialog = ref(null);
 let requestVersion = 0;
 const spriteObserver = new ResizeObserver(entries => {
   for (const entry of entries) {
@@ -290,7 +292,12 @@ onUnmounted(() => {
             <div class="immersive-entry-wrap"><button type="button" class="immersive-entry" @click="immersiveOpen = true"><UiIcon name="book" :size="20"/>沉浸式浏览<UiIcon name="next" :size="17"/></button><span>全屏阅读，享受更好的浏览体验</span></div>
             <div class="detail-title-row"><span class="category">{{ categoryLabels[data.category] || data.category || '未分类' }}</span><span v-if="data.rating" class="detail-rating">★ {{
                 data.rating
-              }}</span></div>
+              }}</span>
+              <button v-if="data.torrentUrl" class="torrent-link" type="button" @click="torrentDialog.open(data)">
+                <UiIcon :size="14" name="download"/>
+                下载种子
+              </button>
+            </div>
             <h1>{{ data.title }}</h1>
             <p v-if="data.japaneseTitle" class="detail-subtitle">{{ data.japaneseTitle }}</p>
           </div>
@@ -385,5 +392,6 @@ onUnmounted(() => {
       </template>
     </main>
     <ImmersiveReader v-if="immersiveOpen && kind === 'gallery' && data" :gallery="data" :fetch-source="fetchSource" @close="immersiveOpen = false"/>
+    <TorrentDialog ref="torrentDialog"/>
   </div>
 </template>

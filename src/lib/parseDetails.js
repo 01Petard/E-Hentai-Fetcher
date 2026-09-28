@@ -61,6 +61,9 @@ export function parseGalleryDetail(html, requestUrl) {
         url: galleryLink(row.querySelector('.gdt2 a')?.href),
     })).filter(row => row.label && row.value);
     const rating = doc.querySelector('#rating_label')?.textContent.trim().replace(/^Average:\s*/i, '') || '';
+    const torrentAnchor = doc.querySelector('#gd5 a[onclick*="gallerytorrents.php"], #gd5 a[href*="gallerytorrents.php"]');
+    const torrentUrl = sourceUrl(/https:\/\/e-hentai\.org\/gallerytorrents\.php\?gid=\d+&t=[a-f0-9]+/i.exec(
+        torrentAnchor?.getAttribute('onclick') || torrentAnchor?.href || '')?.[0], /^\/gallerytorrents\.php$/);
     const tags = [...doc.querySelectorAll('#taglist tr')].map(row => ({
         label: row.querySelector('.tc')?.textContent.trim().replace(/:$/, '') || '',
         values: [...row.querySelectorAll('.gt, .gtl')].map(node => ({
@@ -102,7 +105,7 @@ export function parseGalleryDetail(html, requestUrl) {
         category: doc.querySelector('#gdc .cs')?.textContent.trim() || '',
         uploader: doc.querySelector('#gdn a')?.textContent.trim() || '',
         uploaderUrl: uploaderLink(doc.querySelector('#gdn a')?.href),
-        metadata, rating, tags, images, comments,
+        metadata, rating, torrentUrl, tags, images, comments,
         imageRange: rangeText, totalImages,
         sourcePageSize,
         sourcePageCount: Math.max(...sourcePageNumbers, sourcePageSize ? Math.ceil(totalImages / sourcePageSize) : 1),

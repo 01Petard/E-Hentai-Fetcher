@@ -1833,6 +1833,10 @@
     font-size: 15px
 }
 
+.detail-title-row .torrent-link {
+    font-size: 13px
+}
+
 .immersive-entry {
     float: none;
     gap: 10px;

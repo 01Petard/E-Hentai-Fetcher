@@ -3,9 +3,9 @@ import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from '
 import {buildSearchUrl} from './lib/search.js';
 import {parseGallery} from './lib/parseGallery.js';
 import {localGalleryUrl} from './lib/parseDetails.js';
-import {parseTorrents} from './lib/parseTorrents.js';
 import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
+import TorrentDialog from './components/TorrentDialog.vue';
 import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
 
 const searchText = ref('');
@@ -75,13 +75,6 @@ const settingsDialog = ref(null);
 const resultsHeading = ref(null);
 const searchInput = ref(null);
 const torrentDialog = ref(null);
-const torrentData = ref(null);
-const torrentTitle = ref('');
-const torrentLoading = ref(false);
-const torrentError = ref('');
-const torrentDownloadError = ref('');
-const downloadingTorrent = ref('');
-let torrentRequestVersion = 0;
 let searchVersion = 0;
 const postedFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric', month: '2-digit', day: '2-digit',
@@ -565,68 +558,6 @@ function navigate(page) {
   runSearch(url, targetIndex);
 }
 
-async function openTorrents(item) {
-  const version = ++torrentRequestVersion;
-  torrentTitle.value = item.title;
-  torrentData.value = null;
-  torrentError.value = '';
-  torrentDownloadError.value = '';
-  torrentLoading.value = true;
-  torrentDialog.value.showModal();
-  try {
-    const response = await fetch('/fetch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: item.torrentUrl, userAgent: navigator.userAgent, extended: false }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || '本地请求失败');
-    if (data.status !== 200) throw new Error(`种子页返回 HTTP ${data.status}`);
-    const parsed = parseTorrents(data.body);
-    if (!parsed.hasList) throw new Error('响应中没有找到种子列表');
-    if (version !== torrentRequestVersion) return;
-    torrentTitle.value = parsed.title || item.title;
-    torrentData.value = parsed;
-  } catch (failure) {
-    if (version === torrentRequestVersion) torrentError.value = failure.message || '获取种子失败';
-  } finally {
-    if (version === torrentRequestVersion) torrentLoading.value = false;
-  }
-}
-
-function closeTorrentDialog() {
-  torrentRequestVersion += 1;
-  torrentDialog.value.close();
-}
-
-async function downloadTorrent(torrent) {
-  downloadingTorrent.value = torrent.downloadUrl;
-  torrentDownloadError.value = '';
-  try {
-    const response = await fetch('/api/torrent-download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: torrent.downloadUrl, userAgent: navigator.userAgent }),
-    });
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || '种子文件下载失败');
-    }
-    const objectUrl = URL.createObjectURL(await response.blob());
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = torrent.filename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
-  } catch (failure) {
-    torrentDownloadError.value = failure.message || '种子文件下载失败';
-  } finally {
-    downloadingTorrent.value = '';
-  }
-}
-
 onMounted(async () => {
   try {
     const saved = JSON.parse(sessionStorage.getItem(searchSessionKey));
@@ -807,7 +738,15 @@ onUnmounted(() => {
             <article v-for="(item, index) in result.items" :key="item.url || index" class="gallery-item">
               <template v-if="view === 'minimal'">
                 <div class="minimal-category"><span class="category">{{ item.category }}</span></div>
-                <time class="minimal-date" :datetime="item.published.replace(' ', 'T')" :title="item.published">{{ relativePublished(item.published) }}</time><div class="minimal-meta"><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="13" /> 种子</button><span v-else class="no-torrent">无种子</span></div>
+                <time :datetime="item.published.replace(' ', 'T')" :title="item.published" class="minimal-date">{{ relativePublished(item.published) }}</time>
+                <div class="minimal-meta"><span v-if="item.ratingPosition" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"
+                                                aria-label="站点星级" class="rating-stars"
+                                                role="img"></span>
+                  <button v-if="item.torrentUrl" class="torrent-link" type="button" @click="torrentDialog.open(item)">
+                    <UiIcon :size="13" name="download"/>
+                    种子
+                  </button>
+                  <span v-else class="no-torrent">无种子</span></div>
                 <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
                   <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
                       v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
@@ -826,7 +765,17 @@ onUnmounted(() => {
               </a>
               <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
               <div class="item-main"><span class="category">{{ item.category }}</span><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span></div>
-              <div class="item-details"><time :datetime="item.published.replace(' ', 'T')" :title="item.published"><UiIcon name="calendar" :size="14" />{{ view === 'extended' ? (item.published || '时间未知') : relativePublished(item.published) }}</time><span :title="item.pages"><UiIcon name="book" :size="14" />{{ view === 'thumbnail' ? `${item.pages.match(/^\d+/)?.[0] || '?'}页` : item.pages || '页数未知' }}</span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="14" />种子</button><span v-else class="no-torrent"><UiIcon name="download" :size="14" />无种子</span></div>
+                <div class="item-details">
+                  <time :datetime="item.published.replace(' ', 'T')" :title="item.published">
+                    <UiIcon :size="14" name="calendar"/>
+                    {{ view === 'extended' ? (item.published || '时间未知') : relativePublished(item.published) }}
+                  </time>
+                  <span :title="item.pages"><UiIcon :size="14" name="book"/>{{ view === 'thumbnail' ? `${item.pages.match(/^\d+/)?.[0] || '?'}页` : item.pages || '页数未知' }}</span>
+                  <button v-if="item.torrentUrl" class="torrent-link" type="button" @click="torrentDialog.open(item)">
+                    <UiIcon :size="14" name="download"/>
+                    种子
+                  </button>
+                  <span v-else class="no-torrent"><UiIcon :size="14" name="download"/>无种子</span></div>
               <div class="item-extra"><a v-if="item.uploaderUrl" :href="item.uploaderUrl" target="_blank" rel="noopener noreferrer">上传者：{{ item.uploader }}</a><div v-for="group in item.tagGroups" :key="group.label" class="tag-group"><span>{{ group.label }}</span><div><template v-for="tag in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag tag-detail-trigger" :title="tag.key" @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else class="tag" :title="tag.key || tag.original">{{ tagText(tag) }}</span></template></div></div></div>
               </template>
             </article>
@@ -845,16 +794,7 @@ onUnmounted(() => {
 
     <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer">作者主页 <UiIcon name="external" :size="13" /></a></nav></footer>
 
-    <dialog ref="torrentDialog" class="torrent-dialog" aria-labelledby="torrent-dialog-title" @click="event => { if (event.target === torrentDialog) closeTorrentDialog(); }" @close="torrentRequestVersion++">
-      <div class="torrent-dialog-content">
-        <div class="torrent-dialog-heading"><div><span class="torrent-dialog-kicker">图库种子</span><h2 id="torrent-dialog-title">{{ torrentTitle }}</h2></div><button type="button" class="close-button" aria-label="关闭种子列表" @click="closeTorrentDialog"><UiIcon name="x" :size="20" /></button></div>
-        <p v-if="torrentLoading" class="torrent-dialog-state" role="status">正在读取种子列表…</p>
-        <p v-else-if="torrentError" class="torrent-dialog-state torrent-dialog-error" role="alert">{{ torrentError }}</p>
-        <p v-else-if="!torrentData?.items.length" class="torrent-dialog-state">这个图库当前没有可下载的种子。</p>
-        <template v-else><p class="torrent-dialog-count">共 {{ torrentData.items.length }} 个种子</p><div class="torrent-list"><article v-for="torrent in torrentData.items" :key="torrent.downloadUrl" class="torrent-entry"><div class="torrent-entry-heading"><strong :title="torrent.name">{{ torrent.name }}</strong><span v-if="torrent.outdated" class="torrent-outdated">已过期</span></div><div class="torrent-facts"><span>发布 {{ torrent.posted || '未知' }}</span><span>大小 {{ torrent.size || '未知' }}</span><span>做种 {{ torrent.seeds || '0' }}</span><span>连接 {{ torrent.peers || '0' }}</span><span>下载 {{ torrent.downloads || '0' }}</span><span v-if="torrent.uploader">上传者 {{ torrent.uploader }}</span></div><button type="button" class="torrent-download" :disabled="Boolean(downloadingTorrent)" @click="downloadTorrent(torrent)"><UiIcon name="download" :size="15" />{{ downloadingTorrent === torrent.downloadUrl ? '下载中…' : '下载种子' }}</button></article></div></template>
-        <p v-if="torrentDownloadError" class="torrent-download-error" role="alert">{{ torrentDownloadError }}</p>
-      </div>
-    </dialog>
+    <TorrentDialog ref="torrentDialog"/>
 
     <dialog ref="settingsDialog" class="settings-dialog" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }">
       <div class="dialog-content"><div class="dialog-heading"><h2>配置中心</h2><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
