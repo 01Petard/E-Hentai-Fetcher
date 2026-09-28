@@ -112,14 +112,19 @@ export function parseGalleryDetail(html, requestUrl) {
 
 export function parseImageDetail(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const image = imageUrl(doc.querySelector('#img')?.getAttribute('src'));
+    const imageNode = doc.querySelector('#img');
+    const image = imageUrl(imageNode?.getAttribute('src'));
     if (!image) throw new Error('响应中没有单页图片');
+    const original = imageUrl(doc.querySelector('a[href*="fullimg"]')?.href);
     const counter = doc.querySelector('#i2 .sn > div')?.textContent || '';
     const numbers = [...counter.matchAll(/\d+/g)].map(match => Number(match[0]));
+    const dimensions = /([\d,]+)\s*x\s*([\d,]+)/i.exec(doc.querySelector('#i4 > div')?.textContent || '');
+    const width = parseInt(imageNode?.style.width, 10) || Number(dimensions?.[1]?.replaceAll(',', '')) || 0;
+    const height = parseInt(imageNode?.style.height, 10) || Number(dimensions?.[2]?.replaceAll(',', '')) || 0;
     return {
         title: doc.querySelector('#i1 h1')?.textContent.trim() || '画廊单页',
         info: doc.querySelector('#i2 > div:last-child')?.textContent.trim() || '',
-        image, number: numbers[0] || 1, total: numbers[1] || 0,
+        image, original, width, height, number: numbers[0] || 1, total: numbers[1] || 0,
         prev: numbers[0] > 1 ? imageLink(doc.querySelector('#i2 #prev')?.href) : '',
         next: numbers[1] && numbers[0] >= numbers[1] ? '' : imageLink(doc.querySelector('#i2 #next')?.href),
         gallery: galleryLink(doc.querySelector('#i5 a[href*="/g/"]')?.href),

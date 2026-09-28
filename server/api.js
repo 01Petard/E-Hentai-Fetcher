@@ -77,6 +77,51 @@ function validTorrentUrl(value) {
   }
 }
 
+function validImageDownloadUrl(value) {
+  try {
+    const url = new URL(value);
+    const imageHost = url.hostname.endsWith('.hath.network') || url.hostname === 'hath.network';
+    const originalLink = url.hostname === 'e-hentai.org' && url.pathname === '/fullimg.php';
+    return url.protocol === 'https:' && !url.username && !url.password && !url.hash &&
+      (imageHost || originalLink) ? url : null;
+  } catch { return null; }
+}
+
+async function streamImageDownload(url, response, cookie, userAgent, filename, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    const upstream = httpsRequest(url, {
+      method: 'GET', agent: proxyAgent(), timeout: 60000,
+      headers: {Accept: 'image/*', Cookie: cookie, Referer: 'https://e-hentai.org/', 'User-Agent': userAgent},
+    }, incoming => {
+      if (incoming.statusCode >= 300 && incoming.statusCode < 400 && incoming.headers.location && redirects < 5) {
+        const next = validImageDownloadUrl(new URL(incoming.headers.location, url).href);
+        incoming.resume();
+        if (next) resolve(streamImageDownload(next, response, cookie, userAgent, filename, redirects + 1));
+        else reject(new Error('图片跳转地址无效'));
+        return;
+      }
+      if (incoming.statusCode !== 200 || !/^image\//i.test(incoming.headers['content-type'] || '')) {
+        incoming.resume();
+        reject(new Error('图片下载失败'));
+        return;
+      }
+      const mime = incoming.headers['content-type'].split(';', 1)[0].toLowerCase();
+      const extension = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif'}[mime] || 'img';
+      response.writeHead(200, {
+        'Content-Type': incoming.headers['content-type'],
+        'Content-Disposition': `attachment; filename="${filename}.${extension}"`,
+        'Cache-Control': 'no-store',
+      });
+      incoming.pipe(response);
+      incoming.on('end', resolve);
+      incoming.on('error', reject);
+    });
+    upstream.on('timeout', () => upstream.destroy(new Error('图片下载超时')));
+    upstream.on('error', reject);
+    upstream.end();
+  });
+}
+
 function fetchTorrent(url, userAgent, redirects = 0) {
   return new Promise((resolve, reject) => {
     const upstream = httpsRequest(url, {
@@ -324,6 +369,18 @@ async function route(request, response) {
     response.end(torrent);
     return;
   }
+  if (path === '/api/image-download' && request.method === 'GET') {
+    const params = new URL(request.url, 'http://127.0.0.1').searchParams;
+    const target = validImageDownloadUrl(params.get('url'));
+    if (!target) throw new Error('图片下载地址无效');
+    const number = Number(params.get('page'));
+    if (!Number.isSafeInteger(number) || number < 1) throw new Error('图片页码无效');
+    const variant = params.get('variant');
+    if (!['preview', 'original'].includes(variant)) throw new Error('图片类型无效');
+    const cookie = await readCookie();
+    await streamImageDownload(target, response, cookie, request.headers['user-agent'] || 'Gallery-Lens', `page-${number}-${variant}`);
+    return;
+  }
   if (path === '/fetch' && request.method === 'POST') {
     const payload = await readJson(request);
     if (typeof payload.url !== 'string') throw new Error('请求地址无效');
@@ -361,12 +418,13 @@ async function route(request, response) {
 
 export function handleApiRequest(request, response) {
   const path = new URL(request.url, 'http://127.0.0.1').pathname;
-  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/fetch'].includes(path)) return false;
+  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/api/image-download', '/fetch'].includes(path)) return false;
   route(request, response).catch(error => {
     if (response.writableEnded) return;
+    if (response.headersSent) { response.destroy(error); return; }
     const userError = ['请求参数过长', '请求 JSON 无效', 'Cookie 无效', '图库参数无效', '请求地址无效',
       '仅允许请求 https://e-hentai.org/ 下的地址', '请先在配置菜单中保存 Cookie',
-      'User-Agent 无效', '展示模式无效', '种子下载地址无效'].includes(error.message);
+      'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', '图片页码无效', '图片类型无效'].includes(error.message);
     sendJson(response, userError ? 400 : 502, { error: userError ? error.message : '请求失败或目标站点不可用' });
   });
   return true;

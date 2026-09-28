@@ -306,6 +306,41 @@
     overflow: hidden
 }
 
+.reader-downloads {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: -4px 0 18px
+}
+
+.reader-downloads a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    background: #17655a;
+    color: white;
+    font-weight: 700;
+    text-decoration: none
+}
+
+.reader-downloads a:hover {
+    background: #104d44
+}
+
+.reader-downloads a:focus-visible {
+    outline: 3px solid #64b6a5;
+    outline-offset: 2px
+}
+
+.reader-downloads span {
+    color: #66736f;
+    font-size: 13px
+}
+
 .reader-image img {
     display: block;
     max-width: 100%;
@@ -714,28 +749,44 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 8px 16px
+    gap: 8px
 }
 
 .detail-gallery-settings label {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 7px;
-    font-size: 13px;
+    gap: 10px;
+    min-height: 38px;
+    padding: 4px 5px 4px 12px;
+    border: 1px solid #d8e3da;
+    border-radius: 9px;
+    background: #f8faf7;
+    font-size: 12px;
     font-weight: 600;
     color: #52665a;
     white-space: nowrap
 }
 
 .detail-gallery-settings select {
-    min-width: 62px;
-    padding: 6px 22px 6px 8px;
-    border: 1px solid #cddbd0;
+    min-width: 60px;
+    min-height: 28px;
+    padding: 3px 23px 3px 9px;
+    border: 1px solid #d8e3da;
     border-radius: 6px;
     background: #fff;
-    color: #244b43;
+    color: #17655a;
     font: inherit;
+    font-weight: 700;
     cursor: pointer
+}
+
+.detail-gallery-settings label:hover {
+    border-color: #a9c9b8;
+    background: #f1f7f2
+}
+
+.detail-gallery-settings select:hover {
+    border-color: #a9c9b8
 }
 
 .detail-image-grid {
@@ -912,8 +963,7 @@
 }
 
 .detail-gallery-settings select {
-    min-width: 55px;
-    padding: 5px 20px 5px 7px
+    min-width: 60px
 }
 
 .detail-pages {
@@ -1104,7 +1154,452 @@
 .detail-overview-heading {
     padding-bottom: 12px;
     margin-bottom: 15px;
-    border-bottom: 1px solid #e5eae5
+    border-bottom: 1px solid #e5eae5;
+    display: flow-root
+}
+
+.immersive-entry {
+    float: right;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    margin: 0 0 8px 16px;
+    border: 1px solid #17655a;
+    border-radius: 9px;
+    background: #eaf6f1;
+    color: #17655a;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer
+}
+
+.immersive-entry svg {
+    width: 18px;
+    height: 18px
+}
+
+.immersive-entry:hover {
+    background: #d9eee5
+}
+
+.immersive-entry:focus-visible {
+    outline: 3px solid #64b6a5;
+    outline-offset: 2px
+}
+
+.immersive-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 1vh 1vw;
+    background: #0b1221a8;
+    backdrop-filter: blur(9px)
+}
+
+.immersive-reader {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: min(100%, 1800px);
+    height: 98vh;
+    height: 98dvh;
+    min-height: 0;
+    color: #f4f6fa;
+    background: #191d26;
+    border: 1px solid #4a5060;
+    border-radius: 18px;
+    box-shadow: 0 28px 70px #05080f88;
+    overflow: hidden
+}
+
+.immersive-reader:fullscreen {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    background: #080a0e
+}
+
+.immersive-reader:fullscreen .immersive-stage {
+    padding: 0
+}
+
+.immersive-reader:fullscreen .immersive-spread {
+    gap: 4px
+}
+
+.immersive-reader:fullscreen .immersive-page {
+    background: #080a0e
+}
+
+.immersive-reader:fullscreen .immersive-footer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3;
+    padding: 18px 24px 20px;
+    background: linear-gradient(transparent, #080a0edf)
+}
+
+.immersive-reader:fullscreen .immersive-header,
+.immersive-reader:fullscreen .immersive-footer,
+.immersive-reader:fullscreen .immersive-turn,
+.immersive-reader:fullscreen .immersive-page-number {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s ease
+}
+
+.immersive-reader:fullscreen.immersive-controls-visible .immersive-header,
+.immersive-reader:fullscreen.immersive-controls-visible .immersive-footer,
+.immersive-reader:fullscreen.immersive-controls-visible .immersive-turn,
+.immersive-reader:fullscreen.immersive-controls-visible .immersive-page-number {
+    opacity: 1;
+    pointer-events: auto
+}
+
+.immersive-reader:fullscreen .immersive-hint {
+    display: none
+}
+
+.immersive-reader:fullscreen:not(.immersive-controls-visible),
+.immersive-reader:fullscreen:not(.immersive-controls-visible) * {
+    cursor: none
+}
+
+.immersive-reader:focus {
+    outline: none
+}
+
+.immersive-header {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 3
+}
+
+.immersive-actions {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+    background: #10141ac7
+}
+
+.immersive-actions button {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer
+}
+
+.immersive-actions button:hover {
+    background: #ffffff25
+}
+
+.immersive-actions svg {
+    width: 23px;
+    height: 23px
+}
+
+.immersive-stage {
+    position: relative;
+    display: grid;
+    place-items: stretch;
+    flex: 1;
+    min-height: 0;
+    padding: 8px 54px 2px
+}
+
+.immersive-spread {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0
+}
+
+.immersive-spread-single {
+    grid-template-columns: minmax(0, 1fr)
+}
+
+.immersive-page {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    background: #11151d;
+    overflow: hidden
+}
+
+.immersive-page img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain
+}
+
+.immersive-page-state {
+    color: #c5cad3;
+    text-align: center
+}
+
+.immersive-page-number {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 13px;
+    border-radius: 20px;
+    background: #171b25d9;
+    color: white;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap
+}
+
+.immersive-turn {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 60px;
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff0d;
+    color: white;
+    font-size: 40px;
+    line-height: 1;
+    cursor: pointer
+}
+
+.immersive-turn:first-child {
+    left: 7px
+}
+
+.immersive-turn:last-child {
+    right: 7px
+}
+
+.immersive-turn:hover:not(:disabled) {
+    background: #ffffff26
+}
+
+.immersive-turn:disabled {
+    opacity: .3;
+    cursor: default
+}
+
+.immersive-footer {
+    flex: none;
+    padding: 10px 20px 14px;
+    background: #191d26
+}
+
+.immersive-progress {
+    display: flex;
+    align-items: center;
+    gap: 18px
+}
+
+.immersive-progress strong {
+    min-width: 68px;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap
+}
+
+.immersive-progress strong span {
+    color: #c1c7d2;
+    font-size: 14px;
+    font-weight: 400
+}
+
+.immersive-progress input {
+    flex: 1;
+    min-width: 0;
+    height: 7px;
+    margin: 0;
+    appearance: none;
+    border-radius: 10px;
+    background: linear-gradient(to right, #3985f4 var(--progress), #636b79 var(--progress));
+    cursor: pointer
+}
+
+.immersive-progress input::-webkit-slider-thumb {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 50%;
+    background: #f4f7ff;
+    box-shadow: 0 1px 5px #0006
+}
+
+.immersive-progress input::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 50%;
+    background: #f4f7ff
+}
+
+.immersive-hint {
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    padding: 10px 15px;
+    border-radius: 10px;
+    background: #171b25ec;
+    color: #f4f6fa;
+    box-shadow: 0 8px 24px #0007;
+    font-size: 12px;
+    white-space: nowrap
+}
+
+.immersive-hint kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px solid #697383;
+    border-radius: 5px;
+    font: inherit
+}
+
+.immersive-hint-leave-active {
+    transition: opacity .22s ease, transform .22s ease
+}
+
+.immersive-hint-leave-to {
+    opacity: 0;
+    transform: translate(-50%, 8px)
+}
+
+.immersive-error {
+    margin: 0 0 10px;
+    color: #ffc1b8;
+    text-align: center
+}
+
+.immersive-error button {
+    border: 0;
+    background: none;
+    color: #fff;
+    text-decoration: underline;
+    cursor: pointer
+}
+
+.immersive-reader button:focus-visible, .immersive-reader input:focus-visible {
+    outline: 3px solid #68a5ff;
+    outline-offset: 3px
+}
+
+.immersive-settings-backdrop { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 16px; background: #080b12a6 }
+.immersive-settings-panel { width: min(100%, 360px); padding: 20px; border: 1px solid #576071; border-radius: 14px; background: #252b36; box-shadow: 0 18px 48px #0008; color: #f4f6fa }
+.immersive-settings-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px }
+.immersive-settings-heading h2 { margin: 0; font-size: 18px }
+.immersive-settings-heading button { width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 25px; cursor: pointer }
+.immersive-settings-heading button:hover { background: #ffffff20 }
+.immersive-settings-option { display: flex; align-items: center; gap: 9px; margin: 12px 0; font-size: 14px }
+.immersive-settings-option input { accent-color: #68a5ff }
+.immersive-settings-option select { margin-left: auto; padding: 6px 9px; border: 1px solid #667184; border-radius: 6px; background: #333b49; color: inherit }
+.immersive-settings-cache { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #465061; font-size: 13px }
+.immersive-settings-cache button { padding: 7px 10px; border: 1px solid #687588; border-radius: 6px; background: #343f50; color: inherit; cursor: pointer }
+.immersive-settings-cache button:disabled { opacity: .5; cursor: default }
+.immersive-settings-panel p { margin: 14px 0 0; color: #c1c9d5; font-size: 12px }
+
+@media (max-width: 760px) {
+    .immersive-backdrop {
+        padding: 0
+    }
+
+    .immersive-reader {
+        width: 100%;
+        height: 100dvh;
+        border-radius: 0
+    }
+
+    .immersive-header {
+        top: 8px;
+        right: 8px
+    }
+
+    .immersive-stage {
+        padding: 4px 6px 0
+    }
+
+    .immersive-spread {
+        gap: 4px
+    }
+
+    .immersive-turn {
+        width: 34px;
+        height: 46px;
+        font-size: 30px;
+        background: #151922aa
+    }
+
+    .immersive-turn:first-child {
+        left: 6px
+    }
+
+    .immersive-turn:last-child {
+        right: 6px
+    }
+
+    .immersive-page-number {
+        bottom: 6px;
+        padding: 3px 7px;
+        font-size: 11px
+    }
+
+    .immersive-footer {
+        padding: 10px 10px 14px
+    }
+
+    .immersive-progress {
+        gap: 12px
+    }
+
+    .immersive-progress strong {
+        min-width: 52px;
+        font-size: 15px
+    }
+
+    .immersive-hint {
+        max-width: calc(100% - 20px);
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        bottom: 60px;
+        white-space: normal
+    }
+}
+
+@media (max-width: 500px) {
+    .immersive-entry {
+        float: none;
+        margin: 0 0 10px
+    }
 }
 
 .detail-overview-heading h1 {
@@ -1243,5 +1738,336 @@
 
     .detail-tags-panel {
         grid-column: 1/-1
+    }
+}
+
+/* Gallery overview and catalog. Keep reader styles separate. */
+.detail-shell.gallery-page {
+    background: #f4f8f6
+}
+
+.gallery-page .detail-main {
+    width: min(1260px, calc(100% - 36px));
+    max-width: none;
+    padding: 24px 0 60px
+}
+
+@media (max-width: 760px) {
+    .gallery-page .detail-main {
+        width: calc(100% - 24px)
+    }
+}
+
+.detail-overview,
+.detail-catalog {
+    background: #fff;
+    border: 1px solid #dfe9e5;
+    border-radius: 16px;
+    box-shadow: 0 12px 32px #244b4310
+}
+
+.detail-overview {
+    padding: 26px 30px
+}
+
+.detail-overview-heading {
+    padding-bottom: 18px;
+    margin-bottom: 20px;
+    border-color: #e5eeea
+}
+
+.detail-overview-heading h1 {
+    margin: 8px 0 3px;
+    font-size: clamp(14px, 1.65vw, 18px);
+    line-height: 1.3;
+    color: #172a32
+}
+
+.immersive-entry-wrap {
+    float: right;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 8px 20px
+}
+
+.immersive-entry-wrap > span {
+    color: #829096;
+    font-size: 11px;
+    white-space: nowrap
+}
+
+.detail-overview-heading .detail-subtitle {
+    color: #71818a;
+    font-size: 14px
+}
+
+.detail-title-row .category {
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #e3f0e9;
+    color: #17655a;
+    font-size: 12px
+}
+
+.detail-rating {
+    color: #bd681e;
+    font-size: 15px
+}
+
+.immersive-entry {
+    float: none;
+    gap: 10px;
+    padding: 11px 18px;
+    margin: 0;
+    border: 0;
+    border-radius: 10px;
+    background: #187867;
+    color: #fff;
+    box-shadow: 0 6px 14px #17655a26;
+    font-size: 15px
+}
+
+.immersive-entry:hover {
+    background: #116656
+}
+
+.immersive-entry svg {
+    width: auto;
+    height: auto
+}
+
+.detail-overview-body {
+    grid-template-columns: minmax(185px, 250px) minmax(290px, 1fr) minmax(260px, 1.15fr);
+    gap: 30px;
+    align-items: stretch
+}
+
+.detail-cover {
+    align-self: start;
+    border: 1px solid #e7eeeb;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px #1d343215
+}
+
+.detail-metadata-panel,
+.detail-tags-panel {
+    min-width: 0;
+    padding-left: 28px;
+    border-left: 1px solid #e5eeea
+}
+
+.detail-metadata-panel h2,
+.detail-tags-panel h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    color: #172a32;
+    font-size: 18px
+}
+
+.detail-metadata-panel h2 svg,
+.detail-tags-panel h2 svg {
+    color: #187867
+}
+
+.detail-tags-panel h2 small {
+    margin-left: 2px;
+    color: #819096;
+    font-size: 12px
+}
+
+.detail-metadata > div {
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px
+}
+
+.detail-metadata dt {
+    color: #73838c
+}
+
+.detail-metadata dd {
+    color: #1c303a
+}
+
+.detail-tags-panel .detail-tag-groups {
+    max-height: 345px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 8px 0 0;
+    scrollbar-color: #a8c9bb transparent;
+    scrollbar-width: thin
+}
+
+.detail-tags-panel .detail-tag-groups:focus-visible {
+    outline: 2px solid #187867;
+    outline-offset: 2px;
+    border-radius: 6px
+}
+
+.detail-tags-panel .detail-tag-row {
+    grid-template-columns: 76px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    padding: 5px 0
+}
+
+.detail-tags-panel .detail-tag-row strong {
+    padding-top: 6px;
+    color: #71818a;
+    font-size: 12px
+}
+
+.detail-tags-panel .detail-tag-row > div {
+    gap: 6px
+}
+
+.detail-tags-panel .detail-tag-row span {
+    padding: 6px 11px;
+    border-radius: 999px;
+    background: #eaf5f0;
+    color: #17655a;
+    font-size: 12px;
+    line-height: 1.3
+}
+
+@media (min-width: 1051px) {
+    .detail-overview-body {
+        grid-template-rows: var(--metadata-height, auto)
+    }
+
+    .detail-overview-body > .detail-metadata-panel {
+        align-self: start
+    }
+
+    .detail-overview-body > .detail-cover {
+        align-self: stretch;
+        height: 100%;
+        min-height: 0;
+        aspect-ratio: auto
+    }
+
+    .detail-overview-body > .detail-tags-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden
+    }
+
+    .detail-tags-panel .detail-tag-groups {
+        flex: 1;
+        min-height: 0;
+        max-height: none
+    }
+}
+
+.detail-catalog {
+    padding: 20px 26px 26px;
+    margin-top: 16px
+}
+
+.detail-catalog .detail-section-heading {
+    margin-bottom: 16px
+}
+
+.detail-catalog h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #172a32;
+    font-size: 21px
+}
+
+.detail-catalog h2 svg {
+    color: #187867
+}
+
+.detail-catalog h2 small {
+    margin-left: 4px;
+    color: #829096;
+    font-size: 12px;
+    font-weight: 500
+}
+
+.detail-catalog .detail-image-grid {
+    gap: 10px
+}
+
+.detail-catalog .detail-image-card {
+    border-color: #e0e9e5;
+    border-radius: 8px;
+    padding: 5px 5px 7px
+}
+
+.detail-catalog .detail-image-card:hover,
+.detail-catalog .detail-image-card:focus-visible {
+    border-color: #2b9b81;
+    box-shadow: 0 5px 14px #17655a1c
+}
+
+.detail-catalog .detail-sprite-frame {
+    border-radius: 5px;
+    background: #f5f8f6
+}
+
+@media (max-width: 1050px) {
+    .detail-overview-body {
+        grid-template-columns: minmax(150px, 210px) minmax(0, 1fr)
+    }
+
+    .detail-tags-panel {
+        grid-column: 1 / -1
+    }
+}
+
+@media (max-width: 700px) {
+    .gallery-page .detail-main {
+        width: calc(100% - 24px);
+        padding: 14px 0 36px
+    }
+
+    .detail-overview {
+        padding: 16px
+    }
+
+    .detail-overview-heading h1 {
+        font-size: 19px
+    }
+
+    .immersive-entry-wrap {
+        float: none;
+        align-items: flex-start;
+        margin: 0 0 14px
+    }
+
+    .detail-overview-body {
+        grid-template-columns: 115px minmax(0, 1fr);
+        gap: 16px
+    }
+
+    .detail-metadata-panel {
+        padding-left: 15px
+    }
+
+    .detail-metadata > div {
+        grid-template-columns: 1fr;
+        gap: 2px;
+        padding: 5px 0;
+        font-size: 11px
+    }
+
+    .detail-tags-panel {
+        padding: 14px 0 0;
+        border-left: 0;
+        border-top: 1px solid #e5eeea
+    }
+
+    .detail-catalog {
+        padding: 16px 12px
     }
 }

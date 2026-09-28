@@ -2,6 +2,8 @@
 import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {galleryLink, imageLink, localGalleryUrl, localImageUrl, parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {readTagCache, refreshTagTranslations} from '../lib/tagTranslations.js';
+import ImmersiveReader from './ImmersiveReader.vue';
+import UiIcon from './UiIcon.vue';
 
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
 const data = ref(null);
@@ -10,13 +12,14 @@ const error = ref('');
 const source = ref('');
 const translations = ref({});
 const pageSize = ref(20);
-const columns = ref(6);
+const columns = ref(10);
 const commentsCollapsed = ref(false);
 const pageIndex = ref(0);
 const jumpOpen = ref(false);
 const jumpValue = ref('');
 const jumpError = ref('');
 const jumpInput = ref(null);
+const immersiveOpen = ref(false);
 let requestVersion = 0;
 const spriteObserver = new ResizeObserver(entries => {
   for (const entry of entries) {
@@ -27,6 +30,15 @@ const spriteObserver = new ResizeObserver(entries => {
     }
   }
 });
+const metadataObserver = new ResizeObserver(entries => {
+  for (const entry of entries) {
+    entry.target.parentElement?.style.setProperty('--metadata-height', `${entry.target.getBoundingClientRect().height}px`);
+  }
+});
+function observeMetadata(element) {
+  metadataObserver.disconnect();
+  if (element) metadataObserver.observe(element);
+}
 const vFitSprite = {
   mounted(element) { spriteObserver.observe(element); },
   unmounted(element) { spriteObserver.unobserve(element); },
@@ -190,6 +202,10 @@ function galleryPageHref(index) {
   return url.pathname + url.search;
 }
 
+function imageDownloadHref(url, variant) {
+  return `/api/image-download?${new URLSearchParams({url, page: String(data.value.number), variant})}`;
+}
+
 function changePageSize() {
   if (![20, 40, 60, 80, 100].includes(pageSize.value)) return;
   try {
@@ -217,6 +233,7 @@ function updateCommentsCollapsed(event) {
 }
 
 function onPopState() {
+  immersiveOpen.value = false;
   load();
 }
 
@@ -251,13 +268,14 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   spriteObserver.disconnect();
+  metadataObserver.disconnect();
   window.removeEventListener('popstate', onPopState);
   window.removeEventListener('keydown', onKeydown);
 });
 </script>
 
 <template>
-  <div class="detail-shell">
+  <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
     <header class="site-header"><a class="brand" href="/"><span class="brand-mark">E<span>·</span></span><span><strong>Gallery Lens</strong><small>在线图库检索</small></span></a>
       <nav class="header-actions"><a href="/">返回搜索</a><a v-if="source" :href="source" target="_blank" rel="noopener noreferrer">原站页面 ↗</a></nav>
     </header>
@@ -267,9 +285,9 @@ onUnmounted(() => {
       <div v-else-if="error" class="detail-state" role="alert"><h1>无法显示详情</h1>
         <p>{{ error }}</p><a href="/">返回搜索页</a></div>
       <template v-else-if="kind === 'gallery' && data">
-        <nav class="detail-breadcrumb" aria-label="当前位置"><a href="/">搜索结果</a><span>/</span><span>画廊详情</span></nav>
         <section class="detail-overview">
           <div class="detail-overview-heading">
+            <div class="immersive-entry-wrap"><button type="button" class="immersive-entry" @click="immersiveOpen = true"><UiIcon name="book" :size="20"/>沉浸式浏览<UiIcon name="next" :size="17"/></button><span>全屏阅读，享受更好的浏览体验</span></div>
             <div class="detail-title-row"><span class="category">{{ categoryLabels[data.category] || data.category || '未分类' }}</span><span v-if="data.rating" class="detail-rating">★ {{
                 data.rating
               }}</span></div>
@@ -278,7 +296,7 @@ onUnmounted(() => {
           </div>
           <div class="detail-overview-body">
             <div v-if="data.cover" class="detail-cover"><img :src="data.cover" :alt="data.title"/></div>
-            <dl class="detail-metadata">
+            <div :ref="observeMetadata" class="detail-metadata-panel"><h2><UiIcon name="info" :size="20"/>基本信息</h2><dl class="detail-metadata">
               <div v-if="data.uploader">
                 <dt>上传者</dt>
                 <dd><a v-if="data.uploaderUrl" :href="`/?url=${encodeURIComponent(data.uploaderUrl)}`">{{ data.uploader }}</a><span v-else>{{ data.uploader }}</span></dd>
@@ -287,9 +305,9 @@ onUnmounted(() => {
                 <dt>{{ metadataLabels[item.label] || item.label }}</dt>
                 <dd><a v-if="item.url" :href="localGalleryUrl(item.url)">{{ metadataValue(item) }}</a><span v-else>{{ metadataValue(item) }}</span></dd>
               </div>
-            </dl>
-            <div v-if="data.tags.length" class="detail-tags-panel"><h2>标签 <small>{{ tagCount }} 项</small></h2>
-              <div class="detail-tag-groups">
+            </dl></div>
+            <div v-if="data.tags.length" class="detail-tags-panel"><h2><UiIcon name="tag" :size="20"/>标签 <small>{{ tagCount }} 项</small></h2>
+              <div class="detail-tag-groups" tabindex="0" aria-label="画廊标签，可滚动查看更多">
                 <div v-for="group in data.tags" :key="group.label" class="detail-tag-row"><strong>{{ namespaceLabels[group.label] || group.label }}</strong>
                   <div><span v-for="tag in group.values" :key="tag.key || tag.name" :title="tag.name">{{ translatedTag(tag) }}</span></div>
                 </div>
@@ -297,9 +315,9 @@ onUnmounted(() => {
             </div>
           </div>
         </section>
-        <section class="detail-section">
+        <section class="detail-section detail-catalog">
           <div class="detail-section-heading">
-            <div><h2>图片目录 <small>{{ data.imageRange }}</small></h2></div>
+            <div><h2><UiIcon name="image" :size="23"/>图片目录 <small>{{ data.imageRange }}</small></h2></div>
             <div class="detail-gallery-controls">
               <div class="detail-gallery-settings"><label for="gallery-page-size">每页数量 <select id="gallery-page-size" v-model.number="pageSize" @change="changePageSize">
                 <option v-for="size in [20, 40, 60, 80, 100]" :key="size" :value="size">{{ size }}</option>
@@ -353,6 +371,11 @@ onUnmounted(() => {
           <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">返回图片目录</a>
           <button type="button" :disabled="!data.next" @click="navigate(data.next)">下一页 →</button>
         </nav>
+        <div class="reader-downloads" aria-label="下载图片">
+          <a :href="imageDownloadHref(data.image, 'preview')"><UiIcon name="download" :size="16"/>下载低保真图</a>
+          <a v-if="data.original" :href="imageDownloadHref(data.original, 'original')"><UiIcon name="download" :size="16"/>下载原图</a>
+          <span v-else>此页未提供原图下载地址</span>
+        </div>
         <div class="reader-image"><img :src="data.image" :alt="`${data.title} 第 ${data.number} 页`" referrerpolicy="no-referrer"/></div>
         <nav class="reader-controls reader-controls-bottom" aria-label="底部图片导航">
           <button type="button" :disabled="!data.prev" @click="navigate(data.prev)">← 上一页</button>
@@ -361,5 +384,6 @@ onUnmounted(() => {
         </nav>
       </template>
     </main>
+    <ImmersiveReader v-if="immersiveOpen && kind === 'gallery' && data" :gallery="data" :fetch-source="fetchSource" @close="immersiveOpen = false"/>
   </div>
 </template>

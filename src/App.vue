@@ -6,6 +6,7 @@ import {localGalleryUrl} from './lib/parseDetails.js';
 import {parseTorrents} from './lib/parseTorrents.js';
 import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
+import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
 
 const searchText = ref('');
 const defaultQuickLinks = [
@@ -44,7 +45,9 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const preferences = reactive({ translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24 });
+const preferences = reactive({ translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: false, immersivePreloadCount: 5 });
+const immersiveCacheStats = ref(getImmersiveCacheStats());
+let unsubscribeImmersiveCache;
 const suggestionOpen = ref(false);
 const selectedSuggestion = ref(-1);
 const searchCaret = ref(0);
@@ -573,13 +576,15 @@ onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
-      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate']) {
+      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload']) {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
+      if ([5, 10, 20].includes(Number(saved.immersivePreloadCount))) preferences.immersivePreloadCount = Number(saved.immersivePreloadCount);
     }
   } catch { /* Keep default preferences when storage is unavailable. */ }
   preferencesReady = true;
+  unsubscribeImmersiveCache = subscribeImmersiveCache(stats => { immersiveCacheStats.value = stats; });
   const currentUrl = new URL(window.location.href);
   const linkedUploader = currentUrl.searchParams.get('url');
   if (linkedUploader) {
@@ -612,6 +617,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unsubscribeImmersiveCache?.();
   window.clearInterval(maintenanceTimer);
   document.removeEventListener('pointerdown', closeTagPopoverOnOutsideClick);
   window.removeEventListener('resize', closeTagPopover);
@@ -772,6 +778,10 @@ onUnmounted(() => {
             <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
             <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
           </div>
+          <h3>沉浸式预载入</h3>
+          <div class="immersive-cache-settings"><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向前预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [5, 10, 20]" :key="count" :value="count">{{ count }} 张</option></select></div>
+          <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>
+          <p class="immersive-cache-note">只缓存图片详情页预览图；关闭阅读窗时自动清空。</p>
           <h3>标签数据库</h3>
           <p>本机缓存标签译名与介绍；自动更新在页面打开期间按设置的间隔检查。</p>
           <div class="tag-update-controls"><label><input v-model="preferences.autoUpdate" type="checkbox" /> 自动更新</label><label for="tag-update-interval">检查间隔</label><select id="tag-update-interval" v-model.number="preferences.updateHours" :disabled="!preferences.autoUpdate"><option :value="6">6 小时</option><option :value="24">24 小时</option><option :value="168">7 天</option></select></div>
