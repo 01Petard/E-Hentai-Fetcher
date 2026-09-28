@@ -1,9 +1,10 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
-import { buildSearchUrl } from './lib/search.js';
-import { parseGallery } from './lib/parseGallery.js';
-import { parseTorrents } from './lib/parseTorrents.js';
-import { readTagCache, refreshTagTranslations } from './lib/tagTranslations.js';
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
+import {buildSearchUrl} from './lib/search.js';
+import {parseGallery} from './lib/parseGallery.js';
+import {localGalleryUrl} from './lib/parseDetails.js';
+import {parseTorrents} from './lib/parseTorrents.js';
+import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
 
 const searchText = ref('');
@@ -579,9 +580,21 @@ onMounted(async () => {
     }
   } catch { /* Keep default preferences when storage is unavailable. */ }
   preferencesReady = true;
+  const currentUrl = new URL(window.location.href);
+  const linkedUploader = currentUrl.searchParams.get('url');
+  if (linkedUploader) {
+    try {
+      const url = new URL(linkedUploader);
+      if (url.protocol === 'https:' && url.hostname === 'e-hentai.org' && /^\/uploader\/[^/]+\/?$/i.test(url.pathname) &&
+          (!url.port || url.port === '443') && !url.username && !url.password && !url.hash) {
+        requestUrl.value = url.href;
+        pageIndex.value = 0;
+      }
+    } catch { /* Ignore invalid uploader links. */
+    }
+  }
   await loadConfig();
   void runSearch(requestUrl.value || defaultGalleryUrl, pageIndex.value);
-  const currentUrl = new URL(window.location.href);
   if (currentUrl.searchParams.get('settings') === '1') {
     openSettings();
     currentUrl.searchParams.delete('settings');
@@ -702,12 +715,20 @@ onUnmounted(() => {
               <template v-if="view === 'minimal'">
                 <div class="minimal-category"><span class="category">{{ item.category }}</span></div>
                 <div class="minimal-meta"><time :datetime="item.published.replace(' ', 'T')" :title="item.published">{{ relativePublished(item.published) }}</time><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="13" /> 种子</button><span v-else class="no-torrent">无种子</span></div>
-                <div class="minimal-content"><h3 class="item-title"><a :href="item.url || undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3><div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key" @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else :title="tag.key || tag.original">{{ tagText(tag) }}</span><template v-if="tagIndex < group.values.length - 1"> · </template></template></span></div><div class="minimal-preview" aria-hidden="true"><img v-if="item.image" :src="item.image" alt="" loading="lazy" decoding="async" /><span v-else>无封面</span></div></div>
+                <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
+                  <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
+                      v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
+                                                                                                     @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else
+                                                                                                                                                                           :title="tag.key || tag.original">{{
+                      tagText(tag)
+                    }}</span><template v-if="tagIndex < group.values.length - 1"> · </template></template></span></div>
+                  <div class="minimal-preview" aria-hidden="true"><img v-if="item.image" :src="item.image" alt="" loading="lazy" decoding="async"/><span v-else>无封面</span></div>
+                </div>
                 <div class="minimal-pages">{{ item.pages || '页数未知' }}</div>
               </template>
               <template v-else>
-              <h3 class="item-title"><a :href="item.url || undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3>
-              <a class="item-image" :href="item.url || undefined" target="_blank" rel="noopener noreferrer">
+                <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
+                <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined">
                 <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" decoding="async" />
                 <span v-else class="missing-image"><UiIcon name="image" :size="24" /> 无封面</span>
               </a>
