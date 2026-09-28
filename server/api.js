@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { request as httpsRequest } from 'node:https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { createSessionCookieJar, exSessionMessage, isExSessionRejected } from './sessionCookies.js';
 const cookieFile = new URL('../.env.local', import.meta.url);
 const debugFile = new URL('../debug.html', import.meta.url);
 const maxRequestBytes = 16 * 1024;
@@ -12,6 +13,7 @@ const tagDatabaseUrl = 'https://github.com/EhTagTranslation/Database/releases/la
 const tagDatabaseCacheTtl = 6 * 60 * 60 * 1000;
 let tagDatabaseCache;
 let tagDatabaseRequest;
+const sessionCookies = createSessionCookieJar();
 
 function proxyAgent() {
   const configured = process.env.HTTPS_PROXY || process.env.https_proxy;
@@ -210,8 +212,15 @@ function fetchTorrent(url, userAgent, site = 'e-hentai.org', cookie = '', redire
 }
 
 function fetchHtml(url, headers, body = null) {
+  const target = new URL(url);
+  const cookie = headers.Cookie ? sessionCookies.mergeCookie(target.hostname, headers.Cookie) : '';
   return new Promise((resolve, reject) => {
-    const upstream = httpsRequest(url, { method: body === null ? 'GET' : 'POST', headers, timeout: 25000, agent: proxyAgent() }, response => {
+    const upstream = httpsRequest(target, {
+      method: body === null ? 'GET' : 'POST',
+      headers: cookie ? {...headers, Cookie: cookie} : headers,
+      timeout: 25000,
+      agent: proxyAgent(),
+    }, response => {
       const chunks = [];
       let size = 0;
       response.on('data', chunk => {
@@ -223,6 +232,7 @@ function fetchHtml(url, headers, body = null) {
         chunks.push(chunk);
       });
       response.on('end', () => {
+        if (cookie) sessionCookies.rememberCookies(target.hostname, cookie, response.headers);
         const contentType = response.headers['content-type'] || '';
         const charset = /charset=([\w-]+)/i.exec(contentType)?.[1] || 'utf-8';
         let body;
@@ -411,7 +421,7 @@ async function route(request, response) {
       throw new Error('User-Agent 无效');
     }
     const site = payload.site === 'exhentai.org' ? 'exhentai.org' : 'e-hentai.org';
-    const torrent = await fetchTorrent(target, payload.userAgent, site, await readCookie(request));
+    const torrent = await fetchTorrent(target, payload.userAgent, site, sessionCookies.mergeCookie(target.hostname, await readCookie(request)));
     if (!torrent.length || torrent[0] !== 0x64) throw new Error('种子文件下载失败');
     const filename = target.pathname.split('/').pop();
     response.writeHead(200, {
@@ -431,7 +441,7 @@ async function route(request, response) {
     if (!Number.isSafeInteger(number) || number < 1) throw new Error('图片页码无效');
     const variant = params.get('variant');
     if (!['preview', 'original'].includes(variant)) throw new Error('图片类型无效');
-    const cookie = await readCookie(request);
+    const cookie = sessionCookies.mergeCookie(target.hostname, await readCookie(request));
     const site = params.get('site') === 'exhentai.org' ? 'exhentai.org' : 'e-hentai.org';
     await streamImageDownload(target, response, cookie, request.headers['user-agent'] || 'Gallery-Lens', `page-${number}-${variant}`, site);
     return;
@@ -472,6 +482,7 @@ async function route(request, response) {
       Referer: target.href,
       'User-Agent': payload.userAgent,
     });
+    if (isExSessionRejected(target.hostname, result)) throw new Error(exSessionMessage);
     sendJson(response, 200, result);
     return;
   }
@@ -486,7 +497,8 @@ export function handleApiRequest(request, response) {
     if (response.headersSent) { response.destroy(error); return; }
     const userError = ['请求参数过长', '请求 JSON 无效', 'Cookie 无效', '图库参数无效', '请求地址无效',
       '仅允许请求 E-Hentai 或 ExHentai 的 HTTPS 地址', '请先在配置菜单中保存 Cookie',
-      'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', 'EX 缩略图地址无效', '图片页码无效', '图片类型无效'].includes(error.message);
+      'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', 'EX 缩略图地址无效', '图片页码无效', '图片类型无效',
+      exSessionMessage].includes(error.message);
     sendJson(response, userError ? 400 : 502, { error: userError ? error.message : '请求失败或目标站点不可用' });
   });
   return true;

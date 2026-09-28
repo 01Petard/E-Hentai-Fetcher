@@ -43,14 +43,24 @@ Cookie 保存在当前浏览器的 `eh_cookie` 中，页面不会回显；不同
 
 <img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281621945.png" alt="image-20260928162107820" style="zoom:50%;" />
 
-### 如何开启EX？
+### 里站会话被拒绝
+
+里站用 Cookie 里的 `igneous` 令牌校验会话，该令牌由里站下发且短期有效，代理会自动接续。如果提示：
+
+```
+ExHentai 拒绝了当前会话（igneous 失效或出口 IP 被里站风控）。请在配置中更新 Cookie，或更换网络节点后重试。
+```
+
+说明当前凭据被里站拒绝了：请重新从已登录的里站浏览器复制完整 Cookie 并保存，或参考下节更换网络节点。
+
+### 如何开启EX
 
 > 参考来源：
 >
 > - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/2662
 > - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/1065
 
-这是一个老生常谈的话题，简单来说，里站会检测你的 IP 风险，欧美节点风险较低，香港日韩偏高，高风险节点可能会导致访问失败，每当访问失败时，里站都会以浏览器Cookie的形式进行记录，并阻止此后的任何访问。所以，如果想要测试账号是否获得权限，务必首先清除里站的Cookie，然后再重新[登录](https://forums.e-hentai.org)，并去[用户配置](https://e-hentai.org/uconfig.php)中确认是否欧美。
+这是一个老生常谈的话题，简单来说，里站会检测你的 IP 风险，欧美节点风险较低，香港日韩偏高，高风险节点可能会导致访问失败，每当访问失败时，里站都会以浏览器 Cookie 的形式进行记录，并阻止此后的任何访问。所以，如果想要测试账号是否获得权限，务必首先清除里站的 Cookie，然后再重新[登录](https://forums.e-hentai.org)，并去[用户配置](https://e-hentai.org/uconfig.php)中确认是否欧美。
 
 ## 本地运行
 
