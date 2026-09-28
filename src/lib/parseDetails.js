@@ -115,16 +115,24 @@ export function parseImageDetail(html) {
     const imageNode = doc.querySelector('#img');
     const image = imageUrl(imageNode?.getAttribute('src'));
     if (!image) throw new Error('响应中没有单页图片');
-    const original = imageUrl(doc.querySelector('a[href*="fullimg"]')?.href);
+    const originalNode = doc.querySelector('a[href*="fullimg"]');
+    const original = imageUrl(originalNode?.href);
+    const originalText = originalNode?.textContent || '';
+    const imageInfo = doc.querySelector('#i4 > div')?.textContent || '';
+    const originalDimensions = /([\d,]+)\s*x\s*([\d,]+)/i.exec(originalText) || /([\d,]+)\s*x\s*([\d,]+)/i.exec(imageInfo);
+    const originalSize = /[\d,.]+\s*(?:[KMGT]i?B|B)\b/i.exec(originalText)?.[0] ||
+        /[\d,.]+\s*(?:[KMGT]i?B|B)\b/i.exec(imageInfo)?.[0] || '';
     const counter = doc.querySelector('#i2 .sn > div')?.textContent || '';
     const numbers = [...counter.matchAll(/\d+/g)].map(match => Number(match[0]));
-    const dimensions = /([\d,]+)\s*x\s*([\d,]+)/i.exec(doc.querySelector('#i4 > div')?.textContent || '');
+    const dimensions = /([\d,]+)\s*x\s*([\d,]+)/i.exec(imageInfo);
     const width = parseInt(imageNode?.style.width, 10) || Number(dimensions?.[1]?.replaceAll(',', '')) || 0;
     const height = parseInt(imageNode?.style.height, 10) || Number(dimensions?.[2]?.replaceAll(',', '')) || 0;
     return {
         title: doc.querySelector('#i1 h1')?.textContent.trim() || '画廊单页',
         info: doc.querySelector('#i2 > div:last-child')?.textContent.trim() || '',
-        image, original, width, height, number: numbers[0] || 1, total: numbers[1] || 0,
+        image, original,
+        originalResolution: originalDimensions ? `${originalDimensions[1]} × ${originalDimensions[2]}` : '', originalSize,
+        width, height, number: numbers[0] || 1, total: numbers[1] || 0,
         prev: numbers[0] > 1 ? imageLink(doc.querySelector('#i2 #prev')?.href) : '',
         next: numbers[1] && numbers[0] >= numbers[1] ? '' : imageLink(doc.querySelector('#i2 #next')?.href),
         gallery: galleryLink(doc.querySelector('#i5 a[href*="/g/"]')?.href),

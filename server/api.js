@@ -98,13 +98,22 @@ function validImageDownloadUrl(value) {
   try {
     const url = new URL(value);
     const imageHost = url.hostname.endsWith('.hath.network') || url.hostname === 'hath.network';
-    const originalLink = url.hostname === 'e-hentai.org' && url.pathname === '/fullimg.php';
+    const originalLink = url.hostname === 'e-hentai.org' &&
+      (url.pathname === '/fullimg.php' || /^\/fullimg\/\d+\/\d+\/[^/]+\/[^/]+$/.test(url.pathname));
     return url.protocol === 'https:' && !url.username && !url.password && !url.hash &&
       (imageHost || originalLink) ? url : null;
   } catch { return null; }
 }
 
-async function streamImageDownload(url, response, cookie, userAgent, filename, redirects = 0) {
+function imageFilenameFromUrl(url) {
+  try {
+    const name = decodeURIComponent(url.pathname.split('/').pop()).replace(/[\\/"\x00-\x1f\x7f]/g, '_');
+    return name !== 'fullimg.php' && /\.[a-z0-9]{2,8}$/i.test(name) ? name : '';
+  } catch { return ''; }
+}
+
+async function streamImageDownload(url, response, cookie, userAgent, fallbackName, redirects = 0, originalName = '') {
+  const sourceName = originalName || imageFilenameFromUrl(url);
   return new Promise((resolve, reject) => {
     const upstream = httpsRequest(url, {
       method: 'GET', agent: proxyAgent(), timeout: 60000,
@@ -113,7 +122,7 @@ async function streamImageDownload(url, response, cookie, userAgent, filename, r
       if (incoming.statusCode >= 300 && incoming.statusCode < 400 && incoming.headers.location && redirects < 5) {
         const next = validImageDownloadUrl(new URL(incoming.headers.location, url).href);
         incoming.resume();
-        if (next) resolve(streamImageDownload(next, response, cookie, userAgent, filename, redirects + 1));
+        if (next) resolve(streamImageDownload(next, response, cookie, userAgent, fallbackName, redirects + 1, sourceName));
         else reject(new Error('图片跳转地址无效'));
         return;
       }
@@ -124,9 +133,11 @@ async function streamImageDownload(url, response, cookie, userAgent, filename, r
       }
       const mime = incoming.headers['content-type'].split(';', 1)[0].toLowerCase();
       const extension = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif'}[mime] || 'img';
+      const filename = sourceName || `${fallbackName}.${extension}`;
+      const encodedFilename = encodeURIComponent(filename).replace(/['()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
       response.writeHead(200, {
         'Content-Type': incoming.headers['content-type'],
-        'Content-Disposition': `attachment; filename="${filename}.${extension}"`,
+        'Content-Disposition': `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`,
         'Cache-Control': 'no-store',
       });
       incoming.pipe(response);
@@ -364,6 +375,12 @@ async function route(request, response) {
     const secure = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
     response.setHeader('Set-Cookie', `eh_cookie=${encodeURIComponent(payload.cookie.trim())}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`);
     sendJson(response, 200, { configured: true });
+    return;
+  }
+  if (path === '/api/config/cookie' && request.method === 'DELETE') {
+    const secure = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+    response.setHeader('Set-Cookie', `eh_cookie=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`);
+    sendJson(response, 200, { configured: Boolean(await readLocalCookie()) });
     return;
   }
   if (path === '/api/torrent-download' && request.method === 'POST') {

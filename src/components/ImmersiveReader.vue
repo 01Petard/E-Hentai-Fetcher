@@ -1,7 +1,7 @@
 <script setup>
 import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
 import {parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
-import {clearImmersiveCache, getImmersiveCacheStats, preloadImmersiveImage, subscribeImmersiveCache, waitForImmersiveImage} from '../lib/immersiveCache.js';
+import {cachedImmersiveImage, cancelPendingImmersiveImages, clearImmersiveCache, getImmersiveCacheStats, immersivePreloadWindow, preloadImmersiveImage, subscribeImmersiveCache} from '../lib/immersiveCache.js';
 
 const props = defineProps({gallery: {type: Object, required: true}, fetchSource: {type: Function, required: true}});
 const emit = defineEmits(['close']);
@@ -14,8 +14,9 @@ const fullscreen = ref(false);
 const controlsVisible = ref(true);
 const hintVisible = ref(true);
 const settingsOpen = ref(false);
-const preloadEnabled = ref(false);
-const preloadCount = ref(5);
+const preloadEnabled = ref(true);
+const preloadAfterCount = ref(20);
+const preloadBeforeCount = ref(10);
 const cacheStats = ref(getImmersiveCacheStats());
 const total = computed(() => props.gallery.totalImages);
 const pageCount = computed(() => pages.value.length || 1);
@@ -67,12 +68,15 @@ async function imageAt(number) {
 function decodeImage(url) {
   const image = new Image();
   image.referrerPolicy = 'no-referrer';
+  image.fetchPriority = 'high';
   image.src = url;
   return image.decode();
 }
 
 async function show(number, navigation = '') {
   const current = ++version;
+  preloadVersion++;
+  cancelPendingImmersiveImages();
   const target = Math.max(1, Math.min(total.value, number));
   error.value = '';
   pending.value = true;
@@ -81,10 +85,7 @@ async function show(number, navigation = '') {
     const [left, right] = await Promise.all([imageAt(target), target < total.value ? imageAt(target + 1).catch(() => null) : Promise.resolve(null)]);
     if (current !== version) return;
     const spread = right && !isWide(left) && !isWide(right) ? [left, right] : [left];
-    const prepared = await Promise.all(spread.map(async (page, offset) => {
-      const cached = await waitForImmersiveImage(target + offset);
-      return {...page, displayUrl: cached || page.image};
-    }));
+    const prepared = spread.map((page, offset) => ({...page, displayUrl: cachedImmersiveImage(target + offset) || page.image}));
     if (current !== version) return;
     await Promise.all(prepared.map(page => decodeImage(page.displayUrl)));
     if (current !== version) return;
@@ -99,7 +100,7 @@ async function show(number, navigation = '') {
   } finally {
     if (current === version) {
       pending.value = false;
-      if (changed) void warmAhead();
+      if (changed && !queuedTurns) void warmNearby();
       if (changed && queuedTurns) {
         const direction = Math.sign(queuedTurns);
         queuedTurns -= direction;
@@ -114,19 +115,17 @@ async function show(number, navigation = '') {
   }
 }
 
-async function warmAhead() {
+async function warmNearby() {
   const current = ++preloadVersion;
   if (!preloadEnabled.value || !pages.value.length) return;
-  const start = first.value + pages.value.length;
-  const end = Math.min(total.value, start + preloadCount.value - 1);
-  const keep = new Set(Array.from({length: Math.min(total.value, end) - first.value + 1}, (_, index) => first.value + index));
+  const {keep, queue} = immersivePreloadWindow(first.value, pages.value.length, total.value, preloadBeforeCount.value, preloadAfterCount.value);
   await nextTick();
   if (current !== preloadVersion) return;
   clearImmersiveCache(keep);
-  let next = start;
+  let next = 0;
   async function worker() {
-    while (current === preloadVersion && next <= end) {
-      const number = next++;
+    while (current === preloadVersion && next < queue.length) {
+      const number = queue[next++];
       try {
         const detail = await imageAt(number);
         if (current !== preloadVersion) return;
@@ -140,9 +139,9 @@ async function warmAhead() {
 function savePreloadSettings() {
   try {
     const preferences = JSON.parse(localStorage.getItem('gallery-lens.preferences')) || {};
-    localStorage.setItem('gallery-lens.preferences', JSON.stringify({...preferences, immersivePreload: preloadEnabled.value, immersivePreloadCount: preloadCount.value}));
+    localStorage.setItem('gallery-lens.preferences', JSON.stringify({...preferences, immersivePreload: preloadEnabled.value, immersivePreloadCount: preloadAfterCount.value, immersivePreloadBeforeCount: preloadBeforeCount.value}));
   } catch { /* Settings still work for this session. */ }
-  if (preloadEnabled.value) void warmAhead();
+  if (preloadEnabled.value) void warmNearby();
   else void clearReaderCache();
 }
 
@@ -256,8 +255,9 @@ function onPageHide() { clearImmersiveCache(); }
 onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem('gallery-lens.preferences'));
-    preloadEnabled.value = saved?.immersivePreload === true;
-    if ([5, 10, 20].includes(Number(saved?.immersivePreloadCount))) preloadCount.value = Number(saved.immersivePreloadCount);
+    if (typeof saved?.immersivePreload === 'boolean') preloadEnabled.value = saved.immersivePreload;
+    if ([10, 20, 40, 60].includes(Number(saved?.immersivePreloadCount))) preloadAfterCount.value = Number(saved.immersivePreloadCount);
+    if ([0, 5, 10, 20].includes(Number(saved?.immersivePreloadBeforeCount))) preloadBeforeCount.value = Number(saved.immersivePreloadBeforeCount);
   } catch { /* Use default preload settings. */ }
   unsubscribeCache = subscribeImmersiveCache(stats => { cacheStats.value = stats; });
   previousOverflow = document.body.style.overflow;
@@ -314,7 +314,7 @@ onUnmounted(() => {
           <button class="immersive-turn" type="button" aria-label="向左翻页" :disabled="first === 1" :inert="fullscreen && !controlsVisible" @click="previousPage">‹</button>
           <div class="immersive-spread" :class="{'immersive-spread-single': pageCount === 1}">
             <div v-for="(page, slot) in pages" :key="first + slot" class="immersive-page">
-              <img :src="page.displayUrl" :alt="`第 ${first + slot} 页`" referrerpolicy="no-referrer"/>
+              <img :src="page.displayUrl" :alt="`第 ${first + slot} 页`" referrerpolicy="no-referrer" fetchpriority="high"/>
               <span class="immersive-page-number">{{ first + slot }} / {{ total }}</span>
             </div>
             <span v-if="pending && !pages.length" class="immersive-page-state">正在加载…</span>
@@ -338,7 +338,8 @@ onUnmounted(() => {
           <section class="immersive-settings-panel" role="dialog" aria-modal="true" aria-label="沉浸式预载入配置">
             <div class="immersive-settings-heading"><h2>沉浸式预载入</h2><button type="button" aria-label="关闭配置" @click="closeSettings">×</button></div>
             <label class="immersive-settings-option"><input v-model="preloadEnabled" type="checkbox" @change="savePreloadSettings"/> 启用预载入</label>
-            <label class="immersive-settings-option" for="reader-preload-count">向前预载入 <select id="reader-preload-count" v-model.number="preloadCount" :disabled="!preloadEnabled" @change="savePreloadSettings"><option v-for="count in [5, 10, 20]" :key="count" :value="count">{{ count }} 张</option></select></label>
+            <label class="immersive-settings-option" for="reader-preload-count">向后预载入 <select id="reader-preload-count" v-model.number="preloadAfterCount" :disabled="!preloadEnabled" @change="savePreloadSettings"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select></label>
+            <label class="immersive-settings-option" for="reader-preload-before-count">向前预载入 <select id="reader-preload-before-count" v-model.number="preloadBeforeCount" :disabled="!preloadEnabled" @change="savePreloadSettings"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></label>
             <div class="immersive-settings-cache"><span>已缓存 {{ cacheStats.ready }} 张<span v-if="cacheStats.loading"> · 加载中 {{ cacheStats.loading }} 张</span></span><button type="button" :disabled="!cacheStats.ready && !cacheStats.loading" @click="clearReaderCache">清理缓存</button></div>
             <p>仅缓存预览图；关闭阅读窗后自动清空。</p>
           </section>

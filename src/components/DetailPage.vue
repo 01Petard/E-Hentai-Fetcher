@@ -373,7 +373,7 @@ onUnmounted(() => {
         </nav>
         <div class="reader-downloads" aria-label="下载图片">
           <a :href="imageDownloadHref(data.image, 'preview')"><UiIcon name="download" :size="16"/>下载低保真图</a>
-          <a v-if="data.original" :href="imageDownloadHref(data.original, 'original')"><UiIcon name="download" :size="16"/>下载原图</a>
+          <a v-if="data.original" :href="imageDownloadHref(data.original, 'original')"><UiIcon name="download" :size="16"/>下载原图<template v-if="data.originalResolution || data.originalSize">（{{ [data.originalResolution, data.originalSize].filter(Boolean).join(' · ') }}）</template></a>
           <span v-else>此页未提供原图下载地址</span>
         </div>
         <div class="reader-image"><img :src="data.image" :alt="`${data.title} 第 ${data.number} 页`" referrerpolicy="no-referrer"/></div>

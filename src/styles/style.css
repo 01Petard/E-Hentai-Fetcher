@@ -1794,10 +1794,10 @@ main { padding-top: 16px; }
 .quick-link-editor input:focus { outline: 2px solid #92b19b; outline-offset: 1px; }
 .quick-link-editor button { display: grid; place-items: center; border: 0; border-radius: 6px; background: #f1f4ef; color: #6a7b6d; }
 .quick-link-editor button:hover { background: #fae9e2; color: #b65b43; }
-.quick-link-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 11px; }
-.quick-link-actions > button:first-child { border: 0; background: none; padding: 8px 0; color: #426b50; font-size: 12px; font-weight: 700; }
-.quick-link-actions > button:first-child:hover { color: #a65e44; }
-.quick-link-actions .primary-button { padding: 9px 12px; }
+.quick-link-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 11px; }
+.quick-link-actions > div, .dialog-actions > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.quick-link-actions .settings-action-button, .dialog-actions .settings-action-button { min-height: 34px; }
+.settings-message { margin: 8px 0 0; color: #396b4c; font-size: 11px; }
 .cookie-settings { border-top: 1px solid #e2e9df; margin-top: 22px; padding-top: 20px; }
 .response-source { width: min(100%, 900px); margin-top: 14px; text-align: left; }
 .response-source summary { cursor: pointer; color: #8f563f; font-size: 12px; font-weight: 700; }
@@ -1898,20 +1898,39 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
 .feature-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
 .feature-switches label, .tag-update-controls label { display: inline-flex; align-items: center; gap: 7px; color: #3d5645; font-size: 12px; cursor: pointer; }
 .feature-switches input, .tag-update-controls input { accent-color: #4d9f78; }
-.immersive-cache-settings, .immersive-cache-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 15px; color: #3d5645; font-size: 12px; }
+.immersive-cache-settings { display: grid; grid-template-columns: minmax(0, 1fr) 104px; align-items: center; gap: 10px 12px; color: #3d5645; font-size: 12px; }
+.immersive-cache-settings > label:first-child { grid-column: 1 / -1; }
+.immersive-cache-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px 15px; color: #3d5645; font-size: 12px; }
 .immersive-cache-settings label { display: inline-flex; align-items: center; gap: 7px; }
 .immersive-cache-settings input { accent-color: #4d9f78; }
-.immersive-cache-settings select { padding: 6px 8px; border: 1px solid #d4ded4; border-radius: 6px; background: #fff; color: #2f4938; font-size: 12px; }
+.immersive-cache-settings select {
+    width: 104px;
+    min-height: 36px;
+    padding: 7px 30px 7px 12px;
+    appearance: none;
+    border: 1px solid #b7cfbf;
+    border-radius: 8px;
+    background: #f8fbf8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%233d7658' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+    color: #2f4938;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color .18s, border-color .18s
+}
+.immersive-cache-settings select:hover:not(:disabled) { border-color: #75aa87; background-color: #edf6ef; }
+.immersive-cache-settings select:focus-visible { outline: 2px solid #4d9f78; outline-offset: 2px; }
+.immersive-cache-settings select:disabled { opacity: .55; cursor: not-allowed; }
 .immersive-cache-status { justify-content: space-between; margin-top: 10px; }
-.immersive-cache-status button { padding: 7px 10px; border: 1px solid #a9c5ad; border-radius: 6px; background: #f4f8f2; color: #315e43; font-size: 12px; font-weight: 700; cursor: pointer; }
-.immersive-cache-status button:disabled { opacity: .55; cursor: default; }
+.settings-action-button { flex: none; padding: 8px 10px; border: 1px solid #a9c5ad; border-radius: 6px; background: #f4f8f2; color: #315e43; font-size: 12px; font-weight: 700; cursor: pointer; }
+.settings-action-button:hover:not(:disabled) { background: #e7f1e5; border-color: #85ae8f; }
+.settings-action-button:focus-visible { outline: 2px solid #4d9f78; outline-offset: 2px; }
+.settings-action-button:disabled { opacity: .55; cursor: default; }
 .feature-settings .immersive-cache-note { margin: 8px 0 0; }
 .tag-update-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 14px; }
 .tag-update-controls select { padding: 6px 8px; border: 1px solid #d4ded4; border-radius: 6px; background: #fff; color: #2f4938; font-size: 12px; }
 .tag-update-status { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-top: 14px; }
 .tag-update-status > div { display: grid; gap: 4px; color: #607565; font-size: 11px; }
-.tag-update-status button { flex: none; padding: 8px 10px; border: 1px solid #a9c5ad; border-radius: 6px; background: #f4f8f2; color: #315e43; font-size: 12px; font-weight: 700; cursor: pointer; }
-.tag-update-status button:disabled { opacity: .6; cursor: wait; }
+.tag-update-status button:disabled { cursor: wait; }
 .feature-settings .tag-update-message { margin-top: 9px; color: #396b4c; }
 @media (max-width: 560px) {
     .tag-suggestions button { display: grid; gap: 2px; }

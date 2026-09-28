@@ -2,6 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/fetch", "destination": "/api/fetch" },
+    { "source": "/gallery", "destination": "/index.html" },
+    { "source": "/image", "destination": "/index.html" },
     { "source": "/debug", "destination": "/debug.html" },
     { "source": "/development-log", "destination": "/development-log.html" }
   ]

@@ -20,6 +20,8 @@ const defaultQuickLinks = [
 const quickLinks = ref(defaultQuickLinks);
 const quickLinkDrafts = ref([]);
 const quickLinkError = ref('');
+const quickLinkMessage = ref('');
+const quickLinkImportInput = ref(null);
 const activeQuickLink = ref('');
 const quickLinksStorageKey = 'gallery-lens.quick-links';
 const searchSessionKey = 'gallery-lens.search-session';
@@ -45,7 +47,7 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const preferences = reactive({ translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: false, immersivePreloadCount: 5 });
+const preferences = reactive({ translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10 });
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
 const suggestionOpen = ref(false);
@@ -66,7 +68,9 @@ const requestUrl = ref('');
 const cookieConfigured = ref(false);
 const cookieDraft = ref('');
 const configError = ref('');
+const configMessage = ref('');
 const savingCookie = ref(false);
+const clearingCookie = ref(false);
 const settingsDialog = ref(null);
 const resultsHeading = ref(null);
 const searchInput = ref(null);
@@ -356,9 +360,17 @@ async function loadConfig() {
 
 function openSettings() {
   configError.value = '';
+  configMessage.value = '';
   cookieDraft.value = '';
   quickLinkError.value = '';
+  quickLinkMessage.value = '';
   quickLinkDrafts.value = quickLinks.value.map(item => ({ ...item }));
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferencesKey));
+    if (typeof saved?.immersivePreload === 'boolean') preferences.immersivePreload = saved.immersivePreload;
+    if ([10, 20, 40, 60].includes(Number(saved?.immersivePreloadCount))) preferences.immersivePreloadCount = Number(saved.immersivePreloadCount);
+    if ([0, 5, 10, 20].includes(Number(saved?.immersivePreloadBeforeCount))) preferences.immersivePreloadBeforeCount = Number(saved.immersivePreloadBeforeCount);
+  } catch { /* Keep the current settings if storage is unavailable. */ }
   settingsDialog.value.showModal();
 }
 
@@ -376,6 +388,7 @@ function normalizeQuickLink(item) {
 
 function saveQuickLinks() {
   quickLinkError.value = '';
+  quickLinkMessage.value = '';
   try {
     const links = quickLinkDrafts.value.map(normalizeQuickLink);
     localStorage.setItem(quickLinksStorageKey, JSON.stringify(links));
@@ -386,6 +399,48 @@ function saveQuickLinks() {
   }
 }
 
+async function importQuickLinks(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  quickLinkError.value = '';
+  quickLinkMessage.value = '';
+  try {
+    if (file.size > 1024 * 1024) throw new Error('JSON 文件不能超过 1 MB');
+    const imported = JSON.parse(await file.text());
+    if (!Array.isArray(imported) || imported.length > 500) throw new Error('请选择包含最多 500 条快捷链接的 JSON 数组');
+    const links = imported.map(normalizeQuickLink);
+    const known = new Set(quickLinkDrafts.value.map(item => item.url));
+    let added = 0;
+    for (const link of links) {
+      if (known.has(link.url)) continue;
+      quickLinkDrafts.value.push(link);
+      known.add(link.url);
+      added++;
+    }
+    quickLinkMessage.value = `已导入 ${added} 条链接，请点击“保存快捷链接”生效。`;
+  } catch (failure) {
+    quickLinkError.value = failure instanceof SyntaxError ? 'JSON 文件格式无效' : failure.message || '导入失败';
+  }
+}
+
+function exportQuickLinks() {
+  quickLinkError.value = '';
+  try {
+    const links = quickLinkDrafts.value.map(normalizeQuickLink);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(links, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'gallery-lens-quick-links.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (failure) {
+    quickLinkError.value = failure.message || '导出失败';
+  }
+}
+
 async function saveCookie() {
   if (!cookieDraft.value.trim()) {
     configError.value = '请输入 Cookie 请求头的值';
@@ -393,6 +448,7 @@ async function saveCookie() {
   }
   savingCookie.value = true;
   configError.value = '';
+  configMessage.value = '';
   try {
     const response = await fetch('/api/config/cookie', {
       method: 'PUT',
@@ -413,6 +469,30 @@ async function saveCookie() {
     configError.value = failure.message;
   } finally {
     savingCookie.value = false;
+  }
+}
+
+async function clearCookie() {
+  clearingCookie.value = true;
+  configError.value = '';
+  configMessage.value = '';
+  try {
+    const response = await fetch('/api/config/cookie', { method: 'DELETE' });
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`Cookie 清理接口返回了非 JSON 响应（HTTP ${response.status}）。`);
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '清理失败');
+    cookieConfigured.value = Boolean(data.configured);
+    cookieDraft.value = '';
+    result.value = null;
+    rawResponse.value = '';
+    clearImmersiveCache();
+    configMessage.value = data.configured ? '浏览器 Cookie 已清理，当前使用本地备用配置。' : '浏览器 Cookie 已清理。';
+  } catch (failure) {
+    configError.value = failure.message || '清理失败';
+  } finally {
+    clearingCookie.value = false;
   }
 }
 
@@ -584,7 +664,8 @@ onMounted(async () => {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
-      if ([5, 10, 20].includes(Number(saved.immersivePreloadCount))) preferences.immersivePreloadCount = Number(saved.immersivePreloadCount);
+      if ([10, 20, 40, 60].includes(Number(saved.immersivePreloadCount))) preferences.immersivePreloadCount = Number(saved.immersivePreloadCount);
+      if ([0, 5, 10, 20].includes(Number(saved.immersivePreloadBeforeCount))) preferences.immersivePreloadBeforeCount = Number(saved.immersivePreloadBeforeCount);
     }
   } catch { /* Keep default preferences when storage is unavailable. */ }
   preferencesReady = true;
@@ -785,21 +866,26 @@ onUnmounted(() => {
             <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
           </div>
           <h3>沉浸式预载入</h3>
-          <div class="immersive-cache-settings"><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向前预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [5, 10, 20]" :key="count" :value="count">{{ count }} 张</option></select></div>
-          <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>
+          <div class="immersive-cache-settings"><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向后预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select><label for="immersive-preload-before-count">向前预载入</label><select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></div>
+          <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button class="settings-action-button" type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>
           <p class="immersive-cache-note">只缓存图片详情页预览图；关闭阅读窗时自动清空。</p>
           <h3>标签数据库</h3>
           <p>本机缓存标签译名与介绍；自动更新在页面打开期间按设置的间隔检查。</p>
           <div class="tag-update-controls"><label><input v-model="preferences.autoUpdate" type="checkbox" /> 自动更新</label><label for="tag-update-interval">检查间隔</label><select id="tag-update-interval" v-model.number="preferences.updateHours" :disabled="!preferences.autoUpdate"><option :value="6">6 小时</option><option :value="24">24 小时</option><option :value="168">7 天</option></select></div>
-          <div class="tag-update-status"><div><span>当前版本：{{ tagUpdate.sha ? tagUpdate.sha.slice(0, 8) : '尚未加载' }}</span><span>上次检查：{{ tagUpdate.checkedAt ? new Date(tagUpdate.checkedAt).toLocaleString('zh-CN') : '尚未检查' }}</span></div><button type="button" :disabled="tagUpdate.busy" @click="updateTagData(true)">{{ tagUpdate.busy ? '检查中…' : '立即检查更新' }}</button></div>
+          <div class="tag-update-status">
+            <div><span>当前版本：{{
+                tagUpdate.sha ? tagUpdate.sha.slice(0, 8) : '尚未加载'
+              }}</span><span>上次检查：{{ tagUpdate.checkedAt ? new Date(tagUpdate.checkedAt).toLocaleString('zh-CN') : '尚未检查' }}</span></div>
+            <button class="settings-action-button" :disabled="tagUpdate.busy" type="button" @click="updateTagData(true)">{{ tagUpdate.busy ? '检查中…' : '检查更新' }}</button>
+          </div>
           <p v-if="tagUpdate.error" class="form-error" role="alert">{{ tagUpdate.error }}{{ tagUpdate.sha ? '；已缓存的标签仍可使用。' : '；请稍后重试。' }}</p><p v-else-if="tagUpdate.message" class="tag-update-message" role="status">{{ tagUpdate.message }}</p>
         </section>
         <section class="quick-link-settings" aria-labelledby="quick-link-settings-title"><h3 id="quick-link-settings-title">快捷链接</h3><p>保存完整地址，点击快捷项时由本地服务请求并解析。</p>
-          <form @submit.prevent="saveQuickLinks"><div v-for="(item, index) in quickLinkDrafts" :key="index" class="quick-link-editor"><input v-model="item.label" type="text" :aria-label="`第 ${index + 1} 项名称`" placeholder="名称" /><input v-model="item.url" type="url" :aria-label="`第 ${index + 1} 项地址`" placeholder="https://e-hentai.org/..." /><button type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button></div><p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><div class="quick-link-actions"><button type="button" @click="quickLinkDrafts.push({ label: '', url: '' })">＋ 添加链接</button><button type="submit" class="primary-button">保存快捷链接</button></div></form>
+          <form @submit.prevent="saveQuickLinks"><div v-for="(item, index) in quickLinkDrafts" :key="index" class="quick-link-editor"><input v-model="item.label" type="text" :aria-label="`第 ${index + 1} 项名称`" placeholder="名称" /><input v-model="item.url" type="url" :aria-label="`第 ${index + 1} 项地址`" placeholder="https://e-hentai.org/..." /><button type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button></div><p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p><input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" /><div class="quick-link-actions"><div><button class="settings-action-button" type="button" @click="quickLinkDrafts.push({ label: '', url: '' })">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div><button class="settings-action-button" type="submit">保存快捷链接</button></div></form>
         </section>
         <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
         <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
-        <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><button type="submit" class="primary-button" :disabled="savingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}<UiIcon name="arrow-right" :size="16" /></button></div></form>
+        <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><p v-else-if="configMessage" class="settings-message" role="status">{{ configMessage }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><div><button class="settings-action-button" type="button" :disabled="clearingCookie || savingCookie || !cookieConfigured" @click="clearCookie">{{ clearingCookie ? '清理中…' : '清理 Cookie' }}</button><button class="settings-action-button" type="submit" :disabled="savingCookie || clearingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}</button></div></div></form>
         </section>
       </div>
     </dialog>
