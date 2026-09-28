@@ -38,6 +38,11 @@ function sendJson(response, status, data) {
 }
 
 async function readJson(request) {
+  if (request.body !== undefined) {
+    const body = JSON.stringify(request.body);
+    if (Buffer.byteLength(body) > maxRequestBytes) throw new Error('请求参数过长');
+    return request.body;
+  }
   const chunks = [];
   let length = 0;
   for await (const chunk of request) {

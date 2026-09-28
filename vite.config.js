@@ -26,6 +26,7 @@ export default defineConfig({
   build: { rollupOptions: { input: {
     main: fileURLToPath(new URL('./index.html', import.meta.url)),
     developmentLog: fileURLToPath(new URL('./development-log.html', import.meta.url)),
+    debug: fileURLToPath(new URL('./debug.html', import.meta.url)),
   } } },
   server: { host: '127.0.0.1', port: 8765, strictPort: true },
   preview: { host: '127.0.0.1', port: 8765, strictPort: true },
