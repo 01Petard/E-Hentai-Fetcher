@@ -399,6 +399,10 @@ async function saveCookie() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cookie: cookieDraft.value }),
     });
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Cookie 保存接口返回了非 JSON 响应（HTTP ${response.status}）。请检查线上 /api/config/cookie 是否转发到 Node 服务。`);
+    }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '保存失败');
     cookieConfigured.value = true;
@@ -642,6 +646,7 @@ onUnmounted(() => {
     <main>
       <section class="search-hero" aria-labelledby="search-title">
         <h1 id="search-title" class="hero-statement">E-Hentai Fetcher：一个E-Hentai第三方代理工具</h1>
+        <p class="hero-subtitle">快速检索、浏览与发现来自 E-Hentai 的内容</p>
         <form class="search-form" @submit.prevent="submitSearch">
           <label class="sr-only" for="search-input">搜索内容</label>
           <UiIcon class="search-icon" name="search" :size="20" />
@@ -697,7 +702,7 @@ onUnmounted(() => {
       <section class="results-section" aria-labelledby="results-title">
         <div ref="resultsHeading" class="results-heading">
           <div><h2 id="results-title">搜索结果 <span v-if="result?.total !== null && result" class="total-pill">{{ result.approximate ? '约 ' : '' }}{{ result.total.toLocaleString() }} 条</span></h2><small v-if="result" class="page-count">本页 {{ result.items.length }} 个条目<span v-if="activeQuickLink"> · {{ activeQuickLink }}</span></small></div>
-          <nav v-if="result" class="pagination" aria-label="上方分页"><button v-for="page in paginationOptions" :key="page.key" type="button" :disabled="!result.pages[page.key]" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" />{{ page.label }}</button></nav>
+          <nav v-if="result" class="pagination" aria-label="上方分页"><button v-for="page in paginationOptions.slice(0, 2)" :key="page.key" type="button" :disabled="!result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button><span class="pagination-current" aria-live="polite">{{ pageIndex === null ? '–' : pageIndex + 1 }}<template v-if="result.total && pageSize"> / {{ Math.ceil(result.total / pageSize) }}</template></span><button v-for="page in paginationOptions.slice(2)" :key="page.key" type="button" :disabled="!result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button></nav>
           <div class="view-switch" role="group" aria-label="展示形式">
               <button type="button" :aria-pressed="view === 'thumbnail'" aria-label="缩略图模式" @click="view = 'thumbnail'"><UiIcon name="grid" :size="16" /> <span>缩略图</span></button>
               <button type="button" :aria-pressed="view === 'extended'" aria-label="扩展模式" @click="view = 'extended'"><UiIcon name="list" :size="17" /> <span>扩展</span></button>
@@ -717,10 +722,11 @@ onUnmounted(() => {
         <template v-else>
           <div v-if="!result.items.length" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>没有找到匹配的图库</strong><p>换个关键词或放宽筛选条件试试。</p></div>
           <div v-else class="gallery" :class="view">
+            <div v-if="view === 'minimal'" class="minimal-header" aria-hidden="true"><span>类型</span><span>日期</span><span>评分 / 种子</span><span>标题 / 关键信息</span><span>页数</span></div>
             <article v-for="(item, index) in result.items" :key="item.url || index" class="gallery-item">
               <template v-if="view === 'minimal'">
                 <div class="minimal-category"><span class="category">{{ item.category }}</span></div>
-                <div class="minimal-meta"><time :datetime="item.published.replace(' ', 'T')" :title="item.published">{{ relativePublished(item.published) }}</time><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="13" /> 种子</button><span v-else class="no-torrent">无种子</span></div>
+                <time class="minimal-date" :datetime="item.published.replace(' ', 'T')" :title="item.published">{{ relativePublished(item.published) }}</time><div class="minimal-meta"><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="13" /> 种子</button><span v-else class="no-torrent">无种子</span></div>
                 <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
                   <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
                       v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
@@ -733,11 +739,11 @@ onUnmounted(() => {
                 <div class="minimal-pages">{{ item.pages || '页数未知' }}</div>
               </template>
               <template v-else>
-                <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
                 <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined">
                 <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" decoding="async" />
                 <span v-else class="missing-image"><UiIcon name="image" :size="24" /> 无封面</span>
               </a>
+              <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
               <div class="item-main"><span class="category">{{ item.category }}</span><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span></div>
               <div class="item-details"><time :datetime="item.published.replace(' ', 'T')" :title="item.published"><UiIcon name="calendar" :size="14" />{{ view === 'extended' ? (item.published || '时间未知') : relativePublished(item.published) }}</time><span :title="item.pages"><UiIcon name="book" :size="14" />{{ view === 'thumbnail' ? `${item.pages.match(/^\d+/)?.[0] || '?'}页` : item.pages || '页数未知' }}</span><button v-if="item.torrentUrl" type="button" class="torrent-link" @click="openTorrents(item)"><UiIcon name="download" :size="14" />种子</button><span v-else class="no-torrent"><UiIcon name="download" :size="14" />无种子</span></div>
               <div class="item-extra"><a v-if="item.uploaderUrl" :href="item.uploaderUrl" target="_blank" rel="noopener noreferrer">上传者：{{ item.uploader }}</a><div v-for="group in item.tagGroups" :key="group.label" class="tag-group"><span>{{ group.label }}</span><div><template v-for="tag in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag tag-detail-trigger" :title="tag.key" @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else class="tag" :title="tag.key || tag.original">{{ tagText(tag) }}</span></template></div></div></div>
