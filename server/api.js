@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { request as httpsRequest } from 'node:https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -14,6 +15,7 @@ const tagDatabaseCacheTtl = 6 * 60 * 60 * 1000;
 let tagDatabaseCache;
 let tagDatabaseRequest;
 const sessionCookies = createSessionCookieJar();
+const quickLinksFile = process.env.QUICK_LINKS_FILE;
 
 function proxyAgent() {
   const configured = process.env.HTTPS_PROXY || process.env.https_proxy;
@@ -344,6 +346,37 @@ async function getTagDatabase(force = false) {
 
 async function route(request, response) {
   const path = new URL(request.url, 'http://127.0.0.1').pathname;
+  if (path === '/api/quick-links' && quickLinksFile) {
+    if (request.method === 'GET') {
+      let links = null;
+      try { links = JSON.parse(await readFile(quickLinksFile, 'utf8')); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      sendJson(response, 200, { links });
+      return;
+    }
+    if (request.method === 'PUT') {
+      const links = await readJson(request);
+      if (!Array.isArray(links) || links.length > 500 || links.some(item => {
+        if (typeof item?.label !== 'string' || !item.label.trim() || item.label.length > 200 || typeof item.url !== 'string') return true;
+        try {
+          const url = new URL(item.url);
+          return url.protocol !== 'https:' || !['e-hentai.org', 'exhentai.org'].includes(url.hostname) ||
+            Boolean(url.username || url.password || url.hash || (url.port && url.port !== '443'));
+        } catch { return true; }
+      })) throw new Error('快捷链接格式无效');
+      await mkdir(dirname(quickLinksFile), { recursive: true });
+      const temporary = `${quickLinksFile}.${process.pid}.tmp`;
+      await writeFile(temporary, JSON.stringify(links), { mode: 0o600 });
+      await rename(temporary, quickLinksFile);
+      sendJson(response, 200, { links });
+      return;
+    }
+    if (request.method === 'DELETE') {
+      try { await unlink(quickLinksFile); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      sendJson(response, 200, { links: null });
+      return;
+    }
+  }
   if (path === '/debug' && request.method === 'GET') {
     const html = await readFile(debugFile);
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': html.length });
@@ -491,14 +524,14 @@ async function route(request, response) {
 
 export function handleApiRequest(request, response) {
   const path = new URL(request.url, 'http://127.0.0.1').pathname;
-  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/api/image-download', '/api/ex-cover', '/fetch'].includes(path)) return false;
+  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/api/image-download', '/api/ex-cover', '/fetch', ...(quickLinksFile ? ['/api/quick-links'] : [])].includes(path)) return false;
   route(request, response).catch(error => {
     if (response.writableEnded) return;
     if (response.headersSent) { response.destroy(error); return; }
     const userError = ['请求参数过长', '请求 JSON 无效', 'Cookie 无效', '图库参数无效', '请求地址无效',
       '仅允许请求 E-Hentai 或 ExHentai 的 HTTPS 地址', '请先在配置菜单中保存 Cookie',
       'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', 'EX 缩略图地址无效', '图片页码无效', '图片类型无效',
-      exSessionMessage].includes(error.message);
+      '快捷链接格式无效', exSessionMessage].includes(error.message);
     sendJson(response, userError ? 400 : 502, { error: userError ? error.message : '请求失败或目标站点不可用' });
   });
   return true;

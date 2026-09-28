@@ -28,6 +28,7 @@ const quickLinkMessage = ref('');
 const quickLinkImportInput = ref(null);
 const activeQuickLink = ref('');
 const quickLinksStorageKey = 'gallery-lens.quick-links';
+const serverQuickLinks = import.meta.env.VITE_SERVER_QUICK_LINKS === '1';
 const searchSessionKey = 'gallery-lens.search-session';
 const filters = reactive({
   advanced: false,
@@ -392,12 +393,17 @@ function normalizeQuickLink(item) {
   return { label, url: url.href };
 }
 
-function saveQuickLinks() {
+async function saveQuickLinks() {
   quickLinkError.value = '';
   quickLinkMessage.value = '';
   try {
     const links = quickLinkDrafts.value.map(normalizeQuickLink);
-    localStorage.setItem(quickLinksStorageKey, JSON.stringify(links));
+    if (serverQuickLinks) {
+      const response = await fetch('/api/quick-links', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(links),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || '保存快捷链接失败');
+    } else localStorage.setItem(quickLinksStorageKey, JSON.stringify(links));
     quickLinks.value = links;
     settingsDialog.value.close();
   } catch (failure) {
@@ -509,6 +515,16 @@ async function resetSettings() {
   if (!(await clearCookie())) {
     resettingSettings.value = false;
     return;
+  }
+  if (serverQuickLinks) {
+    try {
+      const response = await fetch('/api/quick-links', { method: 'DELETE' });
+      if (!response.ok) throw new Error('清除快捷链接失败');
+    } catch {
+      configError.value = '清除快捷链接失败，请稍后重试';
+      resettingSettings.value = false;
+      return;
+    }
   }
   preferencesReady = false;
   Object.assign(preferences, defaultPreferences);
@@ -660,7 +676,9 @@ onMounted(async () => {
   searchSessionReady = true;
   window.addEventListener('pagehide', saveSearchSession);
   try {
-    const saved = JSON.parse(localStorage.getItem(quickLinksStorageKey));
+    const saved = serverQuickLinks
+      ? (await (await fetch('/api/quick-links')).json()).links
+      : JSON.parse(localStorage.getItem(quickLinksStorageKey));
     if (Array.isArray(saved)) quickLinks.value = saved.map(normalizeQuickLink);
   } catch { /* Keep the built-in links if local configuration is invalid. */ }
   try {

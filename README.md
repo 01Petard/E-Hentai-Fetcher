@@ -29,7 +29,7 @@ Cookie 保存在当前浏览器的 `eh_cookie` 中，页面不会回显；不同
 
 ⚠️**注意**：未设置浏览器 Cookie 时，代理可读取项目根目录的 **`.env.local`** 作为本地调试兜底。**多用户部署不要配置该兜底文件**（⚠️‼️非常重要‼️⚠️），以免未配置 Cookie 的用户共用账号，泄露个人隐私。
 
-快捷链接和浏览偏好保存在浏览器中，搜索状态保存在当前标签页会话中。标签数据库使用服务端缓存和浏览器 IndexedDB；沉浸式图片预载入缓存可在配置中清理。**不要将 Cookie 提交到版本库或写入日志**。
+非 Docker 部署的快捷链接及浏览偏好保存在浏览器中，搜索状态保存在当前标签页会话中。标签数据库使用服务端缓存和浏览器 IndexedDB；沉浸式图片预载入缓存可在配置中清理。**不要将 Cookie 提交到版本库或写入日志**。
 
 ### 正确的内容展示模式
 
@@ -41,7 +41,7 @@ Cookie 保存在当前浏览器的 `eh_cookie` 中，页面不会回显；不同
 
 此时，你需要去Eh/Ex上，将浏览模式改为“扩展”（‼️非常重要‼️）
 
-<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281621945.png" alt="image-20260928162107820" style="zoom:50%;" />
+<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281621945.png" alt="image-20260928162107820" style="zoom:30%;" />
 
 ### 里站会话被拒绝
 
@@ -62,7 +62,7 @@ ExHentai 拒绝了当前会话（igneous 失效或出口 IP 被里站风控）�
 
 这是一个老生常谈的话题，简单来说，里站会检测你的 IP 风险，欧美节点风险较低，香港日韩偏高，高风险节点可能会导致访问失败，每当访问失败时，里站都会以浏览器 Cookie 的形式进行记录，并阻止此后的任何访问。所以，如果想要测试账号是否获得权限，务必首先清除里站的 Cookie，然后再重新[登录](https://forums.e-hentai.org)，并去[用户配置](https://e-hentai.org/uconfig.php)中确认是否欧美。
 
-## 本地运行
+## 运行调试
 
 需要 Node.js `^20.19.0` 或 `>=22.12.0`，建议采用pnpm
 
@@ -75,6 +75,12 @@ pnpm i
 ## 线上部署
 
 该项目目前通过 Vercel 以项目根目录部署，使用 Vite 构建并将输出目录设为 `dist`，`api/` 中的函数处理线上接口，`vercel.json` 提供 `/fetch`、`/debug` 和 `/development-log` 路由；只上传 `dist` 会导致接口返回 404。线上不要配置 `.env.local`。
+
+## Docker部署
+
+在项目根目录执行 `./deploy-docker.sh`，镜像 tag 默认取构建当天日期（如 `20260928`）；也可以传入日期：`./deploy-docker.sh 20260901`。默认监听本机 `127.0.0.1:8765`，可用 `PORT=9000 ./deploy-docker.sh` 改端口。访问 <http://127.0.0.1:8765/>。
+
+脚本创建并挂载 Docker 命名卷 `e-hentai-fetcher-data`，快捷链接保存在卷内的 `quick-links.json`；重建容器不会清除。Docker 部署的快捷链接由同一实例的所有访问者共用。Cookie 仍保存在各自浏览器，不写入数据卷。需要删除快捷链接数据时，可在页面中恢复默认配置，或停掉容器后执行 `docker volume rm e-hentai-fetcher-data`。
 
 ## 使用限制
 
