@@ -10,7 +10,7 @@ import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} fr
 import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
 import LoadingIndicator from './components/LoadingIndicator.vue';
-import {sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
+import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 
 const searchText = ref('');
 const defaultQuickLinks = [
@@ -797,13 +797,13 @@ onUnmounted(() => {
                                                                                                                                                                            :title="tag.key || tag.original">{{
                       tagText(tag)
                     }}</span><template v-if="tagIndex < group.values.length - 1"> · </template></template></span></div>
-                  <div class="minimal-preview" aria-hidden="true"><img v-if="item.image" :src="item.image" alt="" loading="lazy" decoding="async"/><span v-else>无封面</span></div>
+                  <div class="minimal-preview" aria-hidden="true"><img v-if="item.image" :src="displayImageUrl(item.image)" alt="" loading="lazy" decoding="async"/><span v-else>无封面</span></div>
                 </div>
                 <div class="minimal-pages">{{ item.pages || '页数未知' }}</div>
               </template>
               <template v-else>
                 <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined">
-                <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" decoding="async" />
+                <img v-if="item.image" :src="displayImageUrl(item.image)" :alt="item.title" loading="lazy" decoding="async" />
                 <span v-else class="missing-image"><UiIcon name="image" :size="24" /> 无封面</span>
               </a>
               <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>

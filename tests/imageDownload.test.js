@@ -21,6 +21,42 @@ test('image download accepts e-hentai fullimg paths before checking page number'
   }
 });
 
+test('EX cover proxy serves inline images with the required Referer', async () => {
+  const originalRequest = https.request;
+  let requestHeaders;
+  https.request = (url, options, callback) => {
+    assert.equal(url.hostname, 's.exhentai.org');
+    requestHeaders = options.headers;
+    const upstream = new EventEmitter();
+    upstream.end = () => {
+      const incoming = new PassThrough();
+      incoming.statusCode = 200;
+      incoming.headers = {'content-type': 'image/webp'};
+      callback(incoming);
+      incoming.end('image');
+    };
+    return upstream;
+  };
+  syncBuiltinESMExports();
+  const server = createServer((request, response) => handleApiRequest(request, response));
+  try {
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const cover = 'https://s.exhentai.org/w/02/647/89280-q2yabshj.webp';
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/ex-cover?url=${encodeURIComponent(cover)}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('content-disposition'), null);
+    assert.equal(await response.text(), 'image');
+    assert.equal(requestHeaders.Referer, 'https://exhentai.org/');
+    const blocked = await fetch(`http://127.0.0.1:${server.address().port}/api/ex-cover?url=${encodeURIComponent('https://evil.example/w/02/647/89280-q2yabshj.webp')}`);
+    assert.equal(blocked.status, 400);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    https.request = originalRequest;
+    syncBuiltinESMExports();
+  }
+});
+
 test('image download keeps the original filename from its URL', async () => {
   const originalRequest = https.request;
   https.request = (_url, _options, callback) => {

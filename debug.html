@@ -340,7 +340,7 @@
 </template>
 <script type="module">
     import {readLoadingStyle} from '/src/lib/loadingStyle.js';
-    import {sourceHosts, sourceUrl} from '/src/lib/sourceSite.js';
+    import {displayImageUrl, sourceHosts, sourceUrl} from '/src/lib/sourceSite.js';
 
     const urlInput = document.querySelector("#url");
     urlInput.value = sourceUrl(urlInput.value);
@@ -486,12 +486,12 @@
 
                 const cover = item.querySelector(".entry-cover");
                 const image = coverCell.querySelector("img");
-                const imageUrl = safeUrl(image?.getAttribute("data-src") || image?.getAttribute("src"), ["ehgt.org", ...sourceHosts], url);
+                const imageUrl = safeUrl(image?.getAttribute("data-src") || image?.getAttribute("src"), ["ehgt.org", "s.exhentai.org", ...sourceHosts], url);
                 if (galleryUrl) cover.href = galleryUrl;
                 else cover.removeAttribute("href");
                 if (imageUrl) {
                     const renderedImage = document.createElement("img");
-                    renderedImage.src = imageUrl;
+                    renderedImage.src = displayImageUrl(imageUrl);
                     renderedImage.alt = titleLink.textContent;
                     renderedImage.loading = "lazy";
                     renderedImage.decoding = "async";
@@ -521,7 +521,7 @@
                 if (/^\d{4}-\d{2}-\d{2}/.test(published)) date.dateTime = published.replace(" ", "T");
                 item.querySelector(".entry-pages").textContent = [...(metadata?.children || [])]
                     .find(node => /\bpages?\b/i.test(node.textContent.trim()))?.textContent.trim() || "";
-                const uploaderNode = metadata?.querySelector('a[href*="/uploader/"]');
+                const uploaderNode = [...(metadata?.querySelectorAll('a') || [])].find(anchor => !anchor.closest('.gldown'));
                 const uploader = item.querySelector(".entry-uploader");
                 const uploaderUrl = safeUrl(uploaderNode?.getAttribute("href"), sourceHosts, url);
                 if (uploaderUrl) {

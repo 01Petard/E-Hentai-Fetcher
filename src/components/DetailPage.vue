@@ -8,7 +8,7 @@ import TorrentDialog from './TorrentDialog.vue';
 import UiIcon from './UiIcon.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
 import {readLoadingStyle} from '../lib/loadingStyle.js';
-import {readExEnabled, sourceUrl} from '../lib/sourceSite.js';
+import {displayImageUrl, readExEnabled, sourceUrl} from '../lib/sourceSite.js';
 
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
 const data = ref(null);
@@ -340,7 +340,7 @@ onUnmounted(() => {
             <p v-if="data.japaneseTitle" class="detail-subtitle">{{ data.japaneseTitle }}</p>
           </div>
           <div class="detail-overview-body">
-            <div v-if="data.cover" class="detail-cover"><img :src="data.cover" :alt="data.title"/></div>
+            <div v-if="data.cover" class="detail-cover"><img :src="displayImageUrl(data.cover)" :alt="data.title"/></div>
             <div :ref="observeMetadata" class="detail-metadata-panel"><h2><UiIcon name="info" :size="20"/>基本信息</h2><dl class="detail-metadata">
               <div v-if="data.uploader">
                 <dt>上传者</dt>

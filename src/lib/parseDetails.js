@@ -61,9 +61,11 @@ export function parseGalleryDetail(html, requestUrl) {
         url: galleryLink(row.querySelector('.gdt2 a')?.getAttribute('href'), requestUrl),
     })).filter(row => row.label && row.value);
     const rating = doc.querySelector('#rating_label')?.textContent.trim().replace(/^Average:\s*/i, '') || '';
-    const torrentAnchor = doc.querySelector('#gd5 a[onclick*="gallerytorrents.php"], #gd5 a[href*="gallerytorrents.php"]');
-    const torrentUrl = detailSourceUrl(/https:\/\/(?:e-hentai|exhentai)\.org\/gallerytorrents\.php\?gid=\d+&t=[a-f0-9]+/i.exec(
-        torrentAnchor?.getAttribute('onclick') || torrentAnchor?.href || '')?.[0], /^\/gallerytorrents\.php$/, requestUrl);
+    const torrentAnchor = [...doc.querySelectorAll('#gd5 a')].find(anchor => /Torrent Download/i.test(anchor.textContent));
+    const torrentTarget = torrentAnchor?.getAttribute('href') === '#'
+        ? /popUp\(['"]([^'"]+)/.exec(torrentAnchor.getAttribute('onclick') || '')?.[1]
+        : torrentAnchor?.getAttribute('href');
+    const torrentUrl = detailSourceUrl(torrentTarget, /^\/gallerytorrents\.php$/, requestUrl);
     const tags = [...doc.querySelectorAll('#taglist tr')].map(row => ({
         label: row.querySelector('.tc')?.textContent.trim().replace(/:$/, '') || '',
         values: [...row.querySelectorAll('.gt, .gtl')].map(node => ({
@@ -71,19 +73,21 @@ export function parseGalleryDetail(html, requestUrl) {
             key: node.id.startsWith('td_') ? translationKey(node.id.slice(3)) : '',
         })).filter(tag => tag.name),
     })).filter(group => group.values.length);
-    const images = [...doc.querySelectorAll('#gdt > a')].map(anchor => {
+    const rangeText = doc.querySelector('.gpc')?.textContent.trim() || '';
+    const range = /Showing\s+([\d,]+)\s*-\s*([\d,]+)\s+of\s+([\d,]+)\s+images/i.exec(rangeText);
+    const firstImageNumber = Number(range?.[1]?.replaceAll(',', '')) || 1;
+    const images = [...doc.querySelectorAll('#gdt > a')].map((anchor, index) => {
         const cell = anchor.querySelector('div');
         const style = cell?.style;
         const src = imageUrl(/url\(["']?([^"')]+)/.exec(style?.backgroundImage || '')?.[1], requestUrl);
-        const number = Number(/\/\d+-(\d+)\/?$/.exec(anchor.href)?.[1]);
+        const title = cell?.getAttribute('title') || '';
+        const number = Number(/^Page\s+(\d+):/i.exec(title)?.[1]) || firstImageNumber + index;
         return {
-            url: imageLink(anchor.getAttribute('href'), requestUrl), number, name: cell?.title.replace(/^Page \d+:\s*/, '') || '',
+            url: imageLink(anchor.getAttribute('href'), requestUrl), number, name: title.replace(/^Page\s+\d+:\s*/i, ''),
             sprite: src, position: style?.backgroundPosition || '0 0',
             width: style?.width || '200px', height: style?.height || '280px',
         };
     }).filter(item => item.url && item.sprite && Number.isInteger(item.number));
-    const rangeText = doc.querySelector('.gpc')?.textContent.trim() || '';
-    const range = /Showing\s+([\d,]+)\s*-\s*([\d,]+)\s+of\s+([\d,]+)\s+images/i.exec(rangeText);
     const sourcePageNumbers = [...doc.querySelectorAll('.ptt a')]
         .map(anchor => Number(anchor.textContent.trim()))
         .filter(number => Number.isSafeInteger(number) && number > 0);
@@ -118,7 +122,7 @@ export function parseImageDetail(html, requestUrl = sourceOrigin(readExEnabled()
     const imageNode = doc.querySelector('#img');
     const image = imageUrl(imageNode?.getAttribute('src'), requestUrl);
     if (!image) throw new Error('响应中没有单页图片');
-    const originalNode = doc.querySelector('a[href*="fullimg"]');
+    const originalNode = [...doc.querySelectorAll('#i6 a')].find(anchor => /^Download original\b/i.test(anchor.textContent.trim()));
     const original = imageUrl(originalNode?.getAttribute('href'), requestUrl);
     const originalText = originalNode?.textContent || '';
     const imageInfo = doc.querySelector('#i4 > div')?.textContent || '';
@@ -138,6 +142,6 @@ export function parseImageDetail(html, requestUrl = sourceOrigin(readExEnabled()
         width, height, number: numbers[0] || 1, total: numbers[1] || 0,
         prev: numbers[0] > 1 ? imageLink(doc.querySelector('#i2 #prev')?.getAttribute('href'), requestUrl) : '',
         next: numbers[1] && numbers[0] >= numbers[1] ? '' : imageLink(doc.querySelector('#i2 #next')?.getAttribute('href'), requestUrl),
-        gallery: galleryLink(doc.querySelector('#i5 a[href*="/g/"]')?.getAttribute('href'), requestUrl),
+        gallery: galleryLink(doc.querySelector('#i5 .sb a')?.getAttribute('href'), requestUrl),
     };
 }

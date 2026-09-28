@@ -86,9 +86,10 @@ function validCookie(value) {
 function validTorrentUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === 'ehtracker.org' && !url.port &&
-      !url.username && !url.password && !url.search && !url.hash &&
-      /^\/get\/[a-zA-Z0-9/_-]+\.torrent$/.test(url.pathname) ? url : null;
+    const tracker = url.hostname === 'ehtracker.org' && /^\/get\/[a-zA-Z0-9/_-]+\.torrent$/.test(url.pathname);
+    const ex = url.hostname === 'exhentai.org' && /^\/torrent\/\d+\/(?:[a-zA-Z0-9_-]+\/)?[a-f0-9]{40}\.torrent$/i.test(url.pathname);
+    return url.protocol === 'https:' && !url.port && !url.username && !url.password &&
+      !url.search && !url.hash && (tracker || ex) ? url : null;
   } catch {
     return null;
   }
@@ -105,6 +106,15 @@ function validImageDownloadUrl(value) {
   } catch { return null; }
 }
 
+function validExCoverUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 's.exhentai.org' && !url.port &&
+      !url.username && !url.password && !url.search && !url.hash &&
+      /^\/w\/\d{2}\/\d+\/[a-zA-Z0-9_-]+\.(?:webp|jpe?g|png|gif|avif)$/i.test(url.pathname) ? url : null;
+  } catch { return null; }
+}
+
 function imageFilenameFromUrl(url) {
   try {
     const name = decodeURIComponent(url.pathname.split('/').pop()).replace(/[\\/"\x00-\x1f\x7f]/g, '_');
@@ -112,7 +122,7 @@ function imageFilenameFromUrl(url) {
   } catch { return ''; }
 }
 
-async function streamImageDownload(url, response, cookie, userAgent, fallbackName, site = 'e-hentai.org', redirects = 0, originalName = '') {
+async function streamImageDownload(url, response, cookie, userAgent, fallbackName, site = 'e-hentai.org', redirects = 0, originalName = '', inline = false) {
   const sourceName = originalName || imageFilenameFromUrl(url);
   return new Promise((resolve, reject) => {
     const upstream = httpsRequest(url, {
@@ -120,9 +130,9 @@ async function streamImageDownload(url, response, cookie, userAgent, fallbackNam
       headers: {Accept: 'image/*', Cookie: cookie, Referer: `https://${site}/`, 'User-Agent': userAgent},
     }, incoming => {
       if (incoming.statusCode >= 300 && incoming.statusCode < 400 && incoming.headers.location && redirects < 5) {
-        const next = validImageDownloadUrl(new URL(incoming.headers.location, url).href);
+        const next = (inline ? validExCoverUrl : validImageDownloadUrl)(new URL(incoming.headers.location, url).href);
         incoming.resume();
-        if (next) settle(resolve, streamImageDownload(next, response, cookie, userAgent, fallbackName, site, redirects + 1, sourceName));
+        if (next) settle(resolve, streamImageDownload(next, response, cookie, userAgent, fallbackName, site, redirects + 1, sourceName, inline));
         else settle(reject, new Error('图片跳转地址无效'));
         return;
       }
@@ -137,8 +147,8 @@ async function streamImageDownload(url, response, cookie, userAgent, fallbackNam
       const encodedFilename = encodeURIComponent(filename).replace(/['()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
       response.writeHead(200, {
         'Content-Type': incoming.headers['content-type'],
-        'Content-Disposition': `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`,
-        'Cache-Control': 'no-store',
+        ...(!inline ? {'Content-Disposition': `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodedFilename}`} : {}),
+        'Cache-Control': inline ? 'private, max-age=3600' : 'no-store',
       });
       incoming.pipe(response);
       incoming.on('end', () => settle(resolve));
@@ -158,19 +168,21 @@ async function streamImageDownload(url, response, cookie, userAgent, fallbackNam
   });
 }
 
-function fetchTorrent(url, userAgent, site = 'e-hentai.org', redirects = 0) {
+function fetchTorrent(url, userAgent, site = 'e-hentai.org', cookie = '', redirects = 0) {
   return new Promise((resolve, reject) => {
+    const headers = { Accept: 'application/x-bittorrent,application/octet-stream,*/*', Referer: `https://${site}/`, 'User-Agent': userAgent };
+    if (url.hostname === 'exhentai.org' && cookie) headers.Cookie = cookie;
     const upstream = httpsRequest(url, {
       method: 'GET',
       agent: proxyAgent(),
       timeout: 25000,
-      headers: { Accept: 'application/x-bittorrent,application/octet-stream,*/*', Referer: `https://${site}/`, 'User-Agent': userAgent },
+      headers,
     }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location && redirects < 2) {
         let next;
         try { next = validTorrentUrl(new URL(response.headers.location, url).href); } catch { /* Reject malformed redirects. */ }
         response.resume();
-        if (next) resolve(fetchTorrent(next, userAgent, site, redirects + 1));
+        if (next) resolve(fetchTorrent(next, userAgent, site, cookie, redirects + 1));
         else reject(new Error('种子下载地址无效'));
         return;
       }
@@ -399,7 +411,7 @@ async function route(request, response) {
       throw new Error('User-Agent 无效');
     }
     const site = payload.site === 'exhentai.org' ? 'exhentai.org' : 'e-hentai.org';
-    const torrent = await fetchTorrent(target, payload.userAgent, site);
+    const torrent = await fetchTorrent(target, payload.userAgent, site, await readCookie(request));
     if (!torrent.length || torrent[0] !== 0x64) throw new Error('种子文件下载失败');
     const filename = target.pathname.split('/').pop();
     response.writeHead(200, {
@@ -422,6 +434,13 @@ async function route(request, response) {
     const cookie = await readCookie(request);
     const site = params.get('site') === 'exhentai.org' ? 'exhentai.org' : 'e-hentai.org';
     await streamImageDownload(target, response, cookie, request.headers['user-agent'] || 'Gallery-Lens', `page-${number}-${variant}`, site);
+    return;
+  }
+  if (path === '/api/ex-cover' && request.method === 'GET') {
+    const params = new URL(request.url, 'http://127.0.0.1').searchParams;
+    const target = validExCoverUrl(params.get('url'));
+    if (!target) throw new Error('EX 缩略图地址无效');
+    await streamImageDownload(target, response, '', request.headers['user-agent'] || 'Gallery-Lens', 'cover', 'exhentai.org', 0, '', true);
     return;
   }
   if (path === '/fetch' && request.method === 'POST') {
@@ -461,13 +480,13 @@ async function route(request, response) {
 
 export function handleApiRequest(request, response) {
   const path = new URL(request.url, 'http://127.0.0.1').pathname;
-  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/api/image-download', '/fetch'].includes(path)) return false;
+  if (!['/debug', '/api/config', '/api/config/cookie', '/api/gallery-posted', '/api/tag-translations', '/api/torrent-download', '/api/image-download', '/api/ex-cover', '/fetch'].includes(path)) return false;
   route(request, response).catch(error => {
     if (response.writableEnded) return;
     if (response.headersSent) { response.destroy(error); return; }
     const userError = ['请求参数过长', '请求 JSON 无效', 'Cookie 无效', '图库参数无效', '请求地址无效',
       '仅允许请求 E-Hentai 或 ExHentai 的 HTTPS 地址', '请先在配置菜单中保存 Cookie',
-      'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', '图片页码无效', '图片类型无效'].includes(error.message);
+      'User-Agent 无效', '展示模式无效', '种子下载地址无效', '图片下载地址无效', 'EX 缩略图地址无效', '图片页码无效', '图片类型无效'].includes(error.message);
     sendJson(response, userError ? 400 : 502, { error: userError ? error.message : '请求失败或目标站点不可用' });
   });
   return true;

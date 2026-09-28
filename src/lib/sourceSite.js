@@ -19,3 +19,12 @@ export function sourceUrl(value, useEx = readExEnabled(), base = sourceOrigin(us
     return url.href;
   } catch { return ''; }
 }
+
+export function displayImageUrl(value) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 's.exhentai.org'
+      ? `/api/ex-cover?url=${encodeURIComponent(url.href)}` : value;
+  } catch { return ''; }
+}

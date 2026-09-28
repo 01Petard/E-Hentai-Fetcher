@@ -2,9 +2,10 @@ function safeTorrentUrl(value) {
   if (!value) return '';
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === 'ehtracker.org' &&
-      !url.port && !url.username && !url.password && !url.search && !url.hash &&
-      /^\/get\/[a-zA-Z0-9/_-]+\.torrent$/.test(url.pathname) ? url.href : '';
+    const tracker = url.hostname === 'ehtracker.org' && /^\/get\/[a-zA-Z0-9/_-]+\.torrent$/.test(url.pathname);
+    const ex = url.hostname === 'exhentai.org' && /^\/torrent\/\d+\/(?:[a-zA-Z0-9_-]+\/)?[a-f0-9]{40}\.torrent$/i.test(url.pathname);
+    return url.protocol === 'https:' && !url.port && !url.username && !url.password &&
+      !url.search && !url.hash && (tracker || ex) ? url.href : '';
   } catch {
     return '';
   }
@@ -28,9 +29,9 @@ export function parseTorrents(html) {
       if (/Outdated Torrents/i.test(node.textContent)) outdated = true;
       continue;
     }
-    const link = node.querySelector('a[href*=".torrent"]');
+    const link = [...node.querySelectorAll('a')].find(anchor => anchor.getAttribute('href')?.endsWith('.torrent'));
     if (!link) continue;
-    const scripted = /document\.location\s*=\s*(['"])(https:\/\/ehtracker\.org\/get\/[^'"\s]+\.torrent)\1/.exec(link.getAttribute('onclick') || '');
+    const scripted = /document\.location\s*=\s*(['"])(https:\/\/[^'"\s]+\.torrent)\1/.exec(link.getAttribute('onclick') || '');
     const downloadUrl = safeTorrentUrl(scripted?.[2]) || safeTorrentUrl(link.getAttribute('href'));
     if (!downloadUrl) continue;
     items.push({

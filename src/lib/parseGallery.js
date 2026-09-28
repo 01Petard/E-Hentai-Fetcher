@@ -68,7 +68,7 @@ export function parseGallery(html, requestUrl) {
       : rating?.classList.contains('irb') ? 'rtb.png'
       : rating?.classList.contains('irg') ? 'rtg.png' : 'rt.png';
     const published = metadata?.querySelector('[id^="posted_"]')?.textContent.trim() || '';
-    const uploader = metadata?.querySelector('a[href*="/uploader/"]');
+    const uploader = [...(metadata?.querySelectorAll('a') || [])].find(anchor => !anchor.closest('.gldown'));
     const tagGroups = [...detailCell.querySelectorAll('.gl4e table tr')].map(tagRow => ({
       label: tagRow.querySelector('.tc')?.textContent.trim() || '标签',
       values: [...tagRow.querySelectorAll('.gt, .gtl')].map(tag => ({
@@ -79,7 +79,7 @@ export function parseGallery(html, requestUrl) {
     items.push({
       title: titleNode.textContent.trim(),
       url: safeUrl(titleNode.closest('a')?.getAttribute('href'), sourceHosts, requestUrl),
-      image: safeUrl(coverCell.querySelector('img')?.getAttribute('data-src') || coverCell.querySelector('img')?.getAttribute('src'), ['ehgt.org', ...sourceHosts], requestUrl),
+      image: safeUrl(coverCell.querySelector('img')?.getAttribute('data-src') || coverCell.querySelector('img')?.getAttribute('src'), ['ehgt.org', 's.exhentai.org', ...sourceHosts], requestUrl),
       category: metadata?.querySelector('.cn')?.textContent.trim() || '未分类',
       ratingPosition: /^-?\d+px\s+-?\d+px$/.test(ratingPosition) ? ratingPosition : '',
       ratingSprite,
