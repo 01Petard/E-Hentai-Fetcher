@@ -1,91 +1,174 @@
-# E-Hentai Fetcher
+# Gallery Lens
 
-一个提供 E-Hentai 图库搜索与浏览的代理工具，通过本地代理请求目标站点，解析并展示搜索结果与画廊内容。
+> 本项目为面向 E-Hentai / ExHentai 的第三方图库客户端与替代前端，与 E-Hentai / ExHentai 官方无关。Gallery Lens 不托管图库内容，内容仍由源站提供。
 
-在线使用：[Gallery Lens](https://e-fetcher.bugstack.top)
+在线使用：https://e-fetcher.bugstack.top
+
+**Gallery Lens** 通过代理访问并解析 E-Hentai / ExHentai 内容，在保留源站搜索与图库能力的基础上，提供标签增强、信息重组以及更现代的浏览和沉浸式阅读体验。
 
 ## 功能
 
-- **搜索与筛选**：支持 E-Hentai 搜索语法、标签联想，以及页数、评分、种子等高级筛选；可保存常用搜索或上传者链接。
-- **搜索结果**：提供缩略图、扩展列表和紧凑列表，支持分页、相对时间和浏览进度提示；同一标签页内可恢复上次查询状态。
-- **标签增强**：使用 EhTagTranslation 数据库显示中文译名、标签介绍和搜索建议；支持缓存、自动检查与手动更新。
-- **画廊详情**：展示封面、基本信息、标签、图片目录和评论；可调整每页数量、每行数量并跳转页码。标签较多时可在标签区域内滚动。
-- **图片浏览**：可逐页查看图片、下载预览图及源站提供的原图；沉浸式浏览支持翻页、全屏、进度跳转和可选的图片预载入。
-- **种子与调试**：可在搜索结果中查看、下载画廊种子；`/debug` 页面可查看原始响应和解析结果。
+- **搜索与筛选**：支持 E-Hentai 搜索语法、标签联想，以及页数、评分、种子等高级筛选；可保存常用搜索和上传者链接。
+- **搜索结果**：提供缩略图、扩展列表和紧凑列表，支持分页、相对时间、浏览位置提示和搜索状态恢复。
+- **标签增强**：集成 [EhTagTranslation](https://github.com/EhTagTranslation/Database)，提供中文译名、标签介绍和搜索建议，并支持缓存与自动更新。
+- **画廊详情**：展示封面、基本信息、上传者、标签、评分、图片目录、评论和 Torrent。
+- **图片浏览**：支持单页浏览、预览图与原图下载；沉浸式阅读支持双页、全屏、进度跳转、进度保存和图片预加载。
+- **E-Hentai / ExHentai**：支持切换数据源，并自动接续 ExHentai 返回的 `igneous` 会话令牌。
+- **调试工具**：`/debug` 页面可查看请求、原始响应和解析结果。
 
 ## 快速开始
 
-### Cookie 和数据安全
+### 配置 Cookie
 
-首次使用时，在主页右上角的“配置”中保存 E-Hentai 的 Cookie 请求头值。
-
-如何获取自己的 E-Hentai 账号的 Cookie ：👇
+首次使用时，在主页右上角的 **配置** 中保存自己的 E-Hentai / ExHentai Cookie。
 
 <img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281017332.jpg" style="zoom:25%;" />
 
-Cookie 保存在当前浏览器的 `eh_cookie` 中，页面不会回显；不同浏览器互不共享。
+Cookie 保存为当前站点的 `eh_cookie`，并设置为 HttpOnly，前端不会直接读取或回显。
 
-> 后记：在项目的开发测试过程中，本人发现表站和里站的 Cookie 虽然长得不太一样，但是具有互通性，在此仅作说明。
+> ⚠️ **安全说明** ⚠️
+>
+> Gallery Lens 的服务端需要使用该 Cookie 代替用户请求源站。因此使用公共实例意味着需要信任实例运营者；长期使用或对凭据安全要求较高时，建议自行部署。
+>
+> 不要将 Cookie 提交到 Git 仓库或写入日志。
 
-⚠️**注意**：未设置浏览器 Cookie 时，代理可读取项目根目录的 **`.env.local`** 作为本地调试兜底。**多用户部署不要配置该兜底文件**（⚠️‼️非常重要‼️⚠️），以免未配置 Cookie 的用户共用账号，泄露个人隐私。
+本地调试时，如果浏览器没有配置 Cookie，可以在项目根目录的 `.env.local` 中设置：
 
-非 Docker 部署的快捷链接及浏览偏好保存在浏览器中，搜索状态保存在当前标签页会话中。标签数据库使用服务端缓存和浏览器 IndexedDB；沉浸式图片预载入缓存可在配置中清理。**不要将 Cookie 提交到版本库或写入日志**。
+```
+EH_COOKIE=your_cookie
+```
 
-### 正确的内容展示模式
+> `.env.local` 仅用于个人调试。多用户或线上部署不要配置共享 Cookie，否则未配置 Cookie 的访问者可能共用同一账号会话。
 
-如果一切配置妥当后打开页面提示：
+### 设置展示模式
+
+Gallery Lens 当前的搜索结果解析依赖源站的 **Extended** 展示模式。
+
+如果出现：
 
 ```
 响应中没有 Extended 结果表格，可在下方查看原始 HTML。
 ```
 
-此时，你需要去Eh/Ex上，将浏览模式改为“扩展”（‼️非常重要‼️）
+请前往 E-Hentai / ExHentai 用户设置，将图库列表展示模式调整为 **Extended**。
 
-<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609281621945.png" alt="image-20260928162107820" style="zoom:30%;" />
+<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609290859512.png" alt="Extended 展示模式" style="zoom:50%;" />
 
-### 里站会话被拒绝
+### *ExHentai 访问*
 
-里站用 Cookie 里的 `igneous` 令牌校验会话，该令牌由里站下发且短期有效，代理会自动接续。如果提示：
+ExHentai 本身会根据账号、Cookie 和网络环境决定访问结果。Gallery Lens 不会绕过源站权限控制。
+
+如果提示：
 
 ```
 ExHentai 拒绝了当前会话（igneous 失效或出口 IP 被里站风控）。请在配置中更新 Cookie，或更换网络节点后重试。
 ```
 
-说明当前凭据被里站拒绝了：请重新从已登录的里站浏览器复制完整 Cookie 并保存，或参考下节更换网络节点。
+请重新从正常登录 ExHentai 的浏览器复制完整 Cookie，或更换网络环境后重新建立会话。
 
-### 如何开启EX
+该问题的相关讨论：
 
-> 参考来源：
->
-> - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/2662
-> - https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/1065
+- [EhViewer issue #2662](https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/2662)
+- [EhViewer issue #1065](https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues/1065)
 
-这是一个老生常谈的话题，简单来说，里站会检测你的 IP 风险，欧美节点风险较低，香港日韩偏高，高风险节点可能会导致访问失败，每当访问失败时，里站都会以浏览器 Cookie 的形式进行记录，并阻止此后的任何访问。所以，如果想要测试账号是否获得权限，务必首先清除里站的 Cookie，然后再重新[登录](https://forums.e-hentai.org)，并去[用户配置](https://e-hentai.org/uconfig.php)中确认是否欧美。
+## 项目定位
 
-## 运行调试
+Gallery Lens 不是 E-Hentai / ExHentai 的镜像站，也不仅是网页代理。
 
-需要 Node.js `^20.19.0` 或 `>=22.12.0`，建议采用pnpm
+它更接近一个 **Alternative Front-end（第三方替代前端）**：
 
-```bash
-pnpm i
+```
+E-Hentai / ExHentai
+        ↓
+   Proxy / Fetch
+        ↓
+   HTML / API
+        ↓
+ Structured Data
+        ↓
+ Translation / Enhancement
+        ↓
+    Gallery Lens
 ```
 
-打开 <http://127.0.0.1:8765/>，调试页位于 <http://127.0.0.1:8765/debug>
-
-## 线上部署
-
-该项目目前通过 Vercel 以项目根目录部署，使用 Vite 构建并将输出目录设为 `dist`，`api/` 中的函数处理线上接口，`vercel.json` 提供 `/fetch`、`/debug` 和 `/development-log` 路由；只上传 `dist` 会导致接口返回 404。线上不要配置 `.env.local`。
-
-## Docker部署
-
-在项目根目录执行 `./deploy-docker.sh`，镜像 tag 默认取构建当天日期（如 `20260928`）；也可以传入日期：`./deploy-docker.sh 20260901`。默认监听本机 `127.0.0.1:8765`，可用 `PORT=9000 ./deploy-docker.sh` 改端口。访问 <http://127.0.0.1:8765/>。
-
-脚本创建并挂载 Docker 命名卷 `e-hentai-fetcher-data`，快捷链接保存在卷内的 `quick-links.json`；重建容器不会清除。Docker 部署的快捷链接由同一实例的所有访问者共用。Cookie 仍保存在各自浏览器，不写入数据卷。需要删除快捷链接数据时，可在页面中恢复默认配置，或停掉容器后执行 `docker volume rm e-hentai-fetcher-data`。
+源站负责提供内容，Gallery Lens 负责重新组织内容并提供新的交互体验。
 
 ## 使用限制
 
-解析依赖 E-Hentai 当前的 HTML 结构，站点改版后可能需要更新解析逻辑。标签增强首次加载需要联网；搜索结果总数和浏览进度可能是估算值。即使 Cookie 已配置，目标站点仍可能返回 `403` 等访问错误，可通过 `/debug` 查看响应。
+Gallery Lens 目前部分能力依赖 E-Hentai / ExHentai HTML 页面解析，因此：
+
+- 源站修改页面结构后，相关解析逻辑可能需要同步调整。
+- 标签增强首次使用需要联网加载数据库。
+- 搜索结果总数及浏览位置可能为估算值。
+- 即使 Cookie 正确，源站仍可能因为账号、会话或网络环境返回 `403` 等错误。
+- ExHentai 的实际访问权限仍由 ExHentai 决定。
+
+出现异常时，可以通过 `/debug` 查看原始响应和解析结果。
+
+## 本地运行
+
+需要 Node.js `^20.19.0` 或 `>=22.12.0`，推荐使用 pnpm。
+
+```
+pnpm install
+pnpm dev
+```
+
+访问：
+
+```
+http://127.0.0.1:8765/
+```
+
+调试页面：
+
+```
+http://127.0.0.1:8765/debug
+```
+
+## 部署
+
+### Vercel
+
+项目支持直接以仓库根目录部署到 Vercel。
+
+Vite 输出目录为 `dist`，`api/` 中的 Serverless Functions 负责代理和服务端接口，`vercel.json` 提供路由配置。
+
+> 不要只部署 `dist`，否则代理、下载和部分数据增强能力无法工作。线上环境不要配置个人调试用的 `.env.local` Cookie。
+
+### Docker
+
+在项目根目录执行：
+
+```
+./deploy-docker.sh
+```
+
+也可以指定镜像 Tag：
+
+```
+./deploy-docker.sh 20260901
+```
+
+默认监听 `127.0.0.1:8765`，可通过环境变量修改：
+
+```
+PORT=9000 ./deploy-docker.sh
+```
+
+Docker 会创建命名卷 `e-hentai-fetcher-data`，用于持久化快捷链接。快捷链接由同一实例的所有访问者共享，用户 Cookie 仍保存在各自浏览器中，不写入数据卷。
+
+## 数据存储
+
+| 数据            | 保存位置               |
+| --------------- | ---------------------- |
+| Cookie          | 浏览器站点 Cookie      |
+| 搜索状态        | 当前标签页会话         |
+| 浏览偏好        | 浏览器本地存储         |
+| 标签数据库      | 服务端缓存 + IndexedDB |
+| 沉浸式图片缓存  | 浏览器缓存             |
+| Docker 快捷链接 | Docker 数据卷          |
 
 ## 鸣谢
 
-标签翻译、介绍和搜索建议使用 [EhTagTranslation](https://github.com/EhTagTranslation/Database) 社区数据库，并参考了 [EhSyringe](https://github.com/EhTagTranslation/EhSyringe) 的开源工作和功能设计。
+标签翻译、标签介绍和搜索建议使用 [EhTagTranslation Database](https://github.com/EhTagTranslation/Database)，并参考了 [EhSyringe](https://github.com/EhTagTranslation/EhSyringe) 和 [E-Hentai-Downloader](https://github.com/ccloli/E-Hentai-Downloader) 的开源工作与功能设计。
