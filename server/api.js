@@ -357,7 +357,8 @@ async function route(request, response) {
     if (request.method === 'PUT') {
       const links = await readJson(request);
       if (!Array.isArray(links) || links.length > 500 || links.some(item => {
-        if (typeof item?.label !== 'string' || !item.label.trim() || item.label.length > 200 || typeof item.url !== 'string') return true;
+        if (typeof item?.label !== 'string' || !item.label.trim() || item.label.length > 200 || typeof item.url !== 'string' ||
+            (item.sortOrder !== undefined && (!Number.isSafeInteger(item.sortOrder) || item.sortOrder < 1))) return true;
         try {
           const url = new URL(item.url);
           return url.protocol !== 'https:' || !['e-hentai.org', 'exhentai.org'].includes(url.hostname) ||

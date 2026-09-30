@@ -13,19 +13,18 @@ import LoadingIndicator from './components/LoadingIndicator.vue';
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 
 const searchText = ref('');
-const defaultQuickLinks = [
-  { label: 'AHY', url: 'https://e-hentai.org/?f_search=AHY' },
-  { label: 'Yeeting', url: 'https://e-hentai.org/?f_search=yeeting' },
-  { label: '神奇牛子', url: 'https://e-hentai.org/?f_search=神奇牛子' },
-  { label: '转生在巨乳太太隔壁的牛头人', url: 'https://e-hentai.org/?f_search=转生在巨乳太太隔壁的牛头人' },
-  { label: '上传者 bb2333', url: 'https://e-hentai.org/uploader/bb2333' },
-  { label: '自定义', url: 'https://e-hentai.org/?f_search=f:%22big+ass%24%22%3Bf:stockings%24%3Bf:%22big+breasts%24%22%3Bf:blowjob%24%3Bo:%22ai+generated%24%E2%80%9D&f_srdd=4&advsearch=1' },
-];
-const quickLinks = ref(defaultQuickLinks);
+const quickLinks = ref([]);
 const quickLinkDrafts = ref([]);
 const quickLinkError = ref('');
 const quickLinkMessage = ref('');
 const quickLinkImportInput = ref(null);
+const draggingQuickLink = ref(null);
+let quickLinkDraftId = 0;
+let quickLinkDragPreview = null;
+let quickLinkDragStartY = 0;
+let quickLinkDragGrabY = 0;
+let quickLinkDragHeight = 0;
+let quickLinkDragPointerId = null;
 const activeQuickLink = ref('');
 const quickLinksStorageKey = 'gallery-lens.quick-links';
 const serverQuickLinks = import.meta.env.VITE_SERVER_QUICK_LINKS === '1';
@@ -371,7 +370,7 @@ function openSettings() {
   cookieDraft.value = '';
   quickLinkError.value = '';
   quickLinkMessage.value = '';
-  quickLinkDrafts.value = quickLinks.value.map(item => ({ ...item }));
+  quickLinkDrafts.value = quickLinks.value.map(item => ({ ...item, dragId: ++quickLinkDraftId }));
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (typeof saved?.immersivePreload === 'boolean') preferences.immersivePreload = saved.immersivePreload;
@@ -393,11 +392,72 @@ function normalizeQuickLink(item) {
   return { label, url: url.href };
 }
 
+function normalizeQuickLinks(items, useSortOrder = false) {
+  const links = items.map((item, index) => {
+    const link = normalizeQuickLink(item);
+    if (item.sortOrder !== undefined && (!Number.isSafeInteger(item.sortOrder) || item.sortOrder < 1)) {
+      throw new Error(`“${link.label}”的排序值无效`);
+    }
+    return { ...link, sortOrder: useSortOrder ? item.sortOrder ?? index + 1 : index + 1 };
+  });
+  if (useSortOrder) links.sort((a, b) => a.sortOrder - b.sortOrder);
+  return links.map((link, index) => ({ ...link, sortOrder: index + 1 }));
+}
+
+function moveQuickLink(from, to) {
+  if (from === to || from < 0 || to < 0 || to >= quickLinkDrafts.value.length) return;
+  quickLinkDrafts.value.splice(to, 0, quickLinkDrafts.value.splice(from, 1)[0]);
+}
+
+function addQuickLink() {
+  quickLinkDrafts.value.push({ label: '', url: '', dragId: ++quickLinkDraftId });
+}
+
+function startQuickLinkDrag(event, index) {
+  if (event.button !== 0) return;
+  draggingQuickLink.value = quickLinkDrafts.value[index];
+  quickLinkDragPointerId = event.pointerId;
+  quickLinkDragStartY = event.clientY;
+  const row = event.currentTarget.closest('.quick-link-editor');
+  const bounds = row.getBoundingClientRect();
+  quickLinkDragGrabY = event.clientY - bounds.top;
+  quickLinkDragHeight = bounds.height;
+  quickLinkDragPreview = row.cloneNode(true);
+  const inputs = row.querySelectorAll('input');
+  quickLinkDragPreview.querySelectorAll('input').forEach((input, inputIndex) => { input.value = inputs[inputIndex].value; });
+  quickLinkDragPreview.classList.remove('is-dragging');
+  quickLinkDragPreview.classList.add('quick-link-preview');
+  Object.assign(quickLinkDragPreview.style, { left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px` });
+  document.body.appendChild(quickLinkDragPreview);
+  settingsDialog.value.setPointerCapture(event.pointerId);
+}
+
+function dragQuickLink(event) {
+  if (!draggingQuickLink.value || event.pointerId !== quickLinkDragPointerId) return;
+  quickLinkDragPreview.style.transform = `translateY(${event.clientY - quickLinkDragStartY}px)`;
+  const container = settingsDialog.value.querySelector('.quick-link-items');
+  const currentIndex = quickLinkDrafts.value.indexOf(draggingQuickLink.value);
+  const dragCenterY = event.clientY - quickLinkDragGrabY + quickLinkDragHeight / 2 - container.getBoundingClientRect().top;
+  let targetIndex = 0;
+  for (const row of container.children) {
+    if (Number(row.dataset.index) !== currentIndex && dragCenterY > row.offsetTop + row.offsetHeight / 2) targetIndex++;
+  }
+  moveQuickLink(currentIndex, targetIndex);
+}
+
+function stopQuickLinkDrag(event) {
+  if (event?.pointerId !== undefined && event.pointerId !== quickLinkDragPointerId) return;
+  quickLinkDragPreview?.remove();
+  quickLinkDragPreview = null;
+  draggingQuickLink.value = null;
+  quickLinkDragPointerId = null;
+}
+
 async function saveQuickLinks() {
   quickLinkError.value = '';
   quickLinkMessage.value = '';
   try {
-    const links = quickLinkDrafts.value.map(normalizeQuickLink);
+    const links = normalizeQuickLinks(quickLinkDrafts.value);
     if (serverQuickLinks) {
       const response = await fetch('/api/quick-links', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(links),
@@ -421,16 +481,9 @@ async function importQuickLinks(event) {
     if (file.size > 1024 * 1024) throw new Error('JSON 文件不能超过 1 MB');
     const imported = JSON.parse(await file.text());
     if (!Array.isArray(imported) || imported.length > 500) throw new Error('请选择包含最多 500 条快捷链接的 JSON 数组');
-    const links = imported.map(normalizeQuickLink);
-    const known = new Set(quickLinkDrafts.value.map(item => item.url));
-    let added = 0;
-    for (const link of links) {
-      if (known.has(link.url)) continue;
-      quickLinkDrafts.value.push(link);
-      known.add(link.url);
-      added++;
-    }
-    quickLinkMessage.value = `已导入 ${added} 条链接，请点击“保存快捷链接”生效。`;
+    const links = normalizeQuickLinks(imported, true);
+    quickLinkDrafts.value = links.map(item => ({ ...item, dragId: ++quickLinkDraftId }));
+    quickLinkMessage.value = `已导入 ${links.length} 条链接，请点击“保存快捷链接”生效。`;
   } catch (failure) {
     quickLinkError.value = failure instanceof SyntaxError ? 'JSON 文件格式无效' : failure.message || '导入失败';
   }
@@ -439,7 +492,7 @@ async function importQuickLinks(event) {
 function exportQuickLinks() {
   quickLinkError.value = '';
   try {
-    const links = quickLinkDrafts.value.map(normalizeQuickLink);
+    const links = normalizeQuickLinks(quickLinkDrafts.value);
     const url = URL.createObjectURL(new Blob([JSON.stringify(links, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -528,8 +581,8 @@ async function resetSettings() {
   }
   preferencesReady = false;
   Object.assign(preferences, defaultPreferences);
-  quickLinks.value = defaultQuickLinks;
-  quickLinkDrafts.value = defaultQuickLinks.map(item => ({...item}));
+  quickLinks.value = [];
+  quickLinkDrafts.value = [];
   quickLinkError.value = '';
   quickLinkMessage.value = '';
   clearImmersiveProgress();
@@ -679,8 +732,8 @@ onMounted(async () => {
     const saved = serverQuickLinks
       ? (await (await fetch('/api/quick-links')).json()).links
       : JSON.parse(localStorage.getItem(quickLinksStorageKey));
-    if (Array.isArray(saved)) quickLinks.value = saved.map(normalizeQuickLink);
-  } catch { /* Keep the built-in links if local configuration is invalid. */ }
+    if (Array.isArray(saved)) quickLinks.value = normalizeQuickLinks(saved, true);
+  } catch { /* Keep the quick links empty if local configuration is invalid. */ }
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
@@ -901,7 +954,7 @@ onUnmounted(() => {
 
     <TorrentDialog ref="torrentDialog"/>
 
-    <dialog ref="settingsDialog" class="settings-dialog" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }">
+    <dialog ref="settingsDialog" class="settings-dialog" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag">
       <div class="dialog-content"><div class="dialog-heading"><h2>配置中心</h2><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
         <section class="feature-settings" aria-labelledby="feature-settings-title"><h3 id="feature-settings-title">浏览体验</h3>
           <div class="feature-switches">
@@ -928,7 +981,17 @@ onUnmounted(() => {
           <p v-if="tagUpdate.error" class="form-error" role="alert">{{ tagUpdate.error }}{{ tagUpdate.sha ? '；已缓存的标签仍可使用。' : '；请稍后重试。' }}</p><p v-else-if="tagUpdate.message" class="tag-update-message" role="status">{{ tagUpdate.message }}</p>
         </section>
         <section class="quick-link-settings" aria-labelledby="quick-link-settings-title"><h3 id="quick-link-settings-title">快捷链接</h3><p>保存完整地址，点击快捷项时由本地服务请求并解析。</p>
-          <form @submit.prevent="saveQuickLinks"><div v-for="(item, index) in quickLinkDrafts" :key="index" class="quick-link-editor"><input v-model="item.label" type="text" :aria-label="`第 ${index + 1} 项名称`" placeholder="名称" /><input v-model="item.url" type="url" :aria-label="`第 ${index + 1} 项地址`" placeholder="https://e-hentai.org/..." /><button type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button></div><p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p><input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" /><div class="quick-link-actions"><div><button class="settings-action-button" type="button" @click="quickLinkDrafts.push({ label: '', url: '' })">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div><button class="settings-action-button" type="submit">保存快捷链接</button></div></form>
+          <form @submit.prevent="saveQuickLinks">
+            <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
+              <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
+                <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
+                <input v-model="item.label" type="text" :aria-label="`第 ${index + 1} 项名称`" placeholder="名称" />
+                <input v-model="item.url" type="url" :aria-label="`第 ${index + 1} 项地址`" placeholder="https://e-hentai.org/..." />
+                <button type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
+              </div>
+            </TransitionGroup>
+            <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p><input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" /><div class="quick-link-actions"><div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div><button class="settings-action-button" type="submit">保存快捷链接</button></div>
+          </form>
         </section>
         <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
         <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
