@@ -893,7 +893,7 @@ onUnmounted(() => {
                     <UiIcon :size="13" name="download"/>
                     种子
                   </button>
-                  <span v-else class="no-torrent">无种子</span></div>
+                  <span v-else class="no-torrent">暂无种子</span></div>
                 <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
                   <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
                       v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
@@ -922,7 +922,7 @@ onUnmounted(() => {
                     <UiIcon :size="14" name="download"/>
                     种子
                   </button>
-                  <span v-else class="no-torrent"><UiIcon :size="14" name="download"/>无种子</span></div>
+                  <span v-else class="no-torrent"><UiIcon :size="14" name="download"/>暂无种子</span></div>
               <div class="item-extra"><a v-if="item.uploaderUrl" :href="item.uploaderUrl" target="_blank" rel="noopener noreferrer">上传者：{{ item.uploader }}</a><div v-for="group in item.tagGroups" :key="group.label" class="tag-group"><span>{{ group.label }}</span><div><template v-for="tag in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag tag-detail-trigger" :title="tag.key" @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else class="tag" :title="tag.key || tag.original">{{ tagText(tag) }}</span></template></div></div></div>
               </template>
             </article>

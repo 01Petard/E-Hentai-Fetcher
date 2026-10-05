@@ -335,6 +335,7 @@ onUnmounted(() => {
                 <UiIcon :size="14" name="download"/>
                 下载种子
               </button>
+              <span v-else class="no-torrent"><UiIcon :size="14" name="download"/>暂无种子</span>
             </div>
             <h1>{{ data.title }}</h1>
             <p v-if="data.japaneseTitle" class="detail-subtitle">{{ data.japaneseTitle }}</p>

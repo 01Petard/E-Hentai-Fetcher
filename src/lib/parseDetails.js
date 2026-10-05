@@ -65,7 +65,8 @@ export function parseGalleryDetail(html, requestUrl) {
     const torrentTarget = torrentAnchor?.getAttribute('href') === '#'
         ? /popUp\(['"]([^'"]+)/.exec(torrentAnchor.getAttribute('onclick') || '')?.[1]
         : torrentAnchor?.getAttribute('href');
-    const torrentUrl = detailSourceUrl(torrentTarget, /^\/gallerytorrents\.php$/, requestUrl);
+    const torrentCount = /Torrent Download\s*\(\s*(\d+)\s*\)/i.exec(torrentAnchor?.textContent || '')?.[1];
+    const torrentUrl = torrentCount === '0' ? '' : detailSourceUrl(torrentTarget, /^\/gallerytorrents\.php$/, requestUrl);
     const tags = [...doc.querySelectorAll('#taglist tr')].map(row => ({
         label: row.querySelector('.tc')?.textContent.trim().replace(/:$/, '') || '',
         values: [...row.querySelectorAll('.gt, .gtl')].map(node => ({

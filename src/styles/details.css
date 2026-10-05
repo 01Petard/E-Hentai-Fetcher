@@ -1828,6 +1828,15 @@
     font-size: 13px
 }
 
+.detail-title-row .no-torrent {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    color: #849487;
+    font-size: 13px
+}
+
 .detail-title-row .gallery-download-entry,
 .detail-title-row .torrent-link { min-height: 34px; font-family: inherit }
 
