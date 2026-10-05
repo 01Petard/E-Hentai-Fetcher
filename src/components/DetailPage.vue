@@ -85,6 +85,31 @@ const namespaceLabels = {
   temp: '临时'
 };
 const totalPages = computed(() => data.value?.totalImages ? Math.ceil(data.value.totalImages / pageSize.value) : 1);
+const paginationItems = computed(() => {
+  const total = totalPages.value;
+  const current = pageIndex.value + 1;
+  let start = Math.max(1, current - 2);
+  let end = Math.min(total, current + 2);
+  if (total <= 9) {
+    start = 1;
+    end = total;
+  } else if (current <= 4) {
+    start = 1;
+    end = 7;
+  } else if (current >= total - 3) {
+    start = total - 6;
+    end = total;
+  }
+  const pages = [...new Set([1, ...Array.from({length: end - start + 1}, (_, index) => start + index), total])].sort((a, b) => a - b);
+  const items = [];
+  for (const [index, page] of pages.entries()) {
+    const previous = pages[index - 1];
+    if (page - previous === 2) items.push(previous + 1);
+    else if (page - previous > 2) items.push(`gap-${previous}-${page}`);
+    items.push(page);
+  }
+  return items;
+});
 const tagCount = computed(() => data.value?.tags.reduce((sum, group) => sum + group.values.length, 0) || 0);
 
 function translatedTag(tag) {
@@ -375,21 +400,23 @@ onUnmounted(() => {
               </select></label></div>
             </div>
             <div class="detail-gallery-controls">
-              <nav v-if="totalPages > 1" class="detail-pages" aria-label="图片目录分页">
-                <button type="button" :disabled="pageIndex === 0" @click="navigateGallery(0)">第一页</button>
+              <nav class="detail-pages" aria-label="图片目录分页">
                 <button type="button" :disabled="pageIndex === 0" @click="navigateGallery(pageIndex - 1)">上一页</button>
-                <div class="detail-page-jump">
-                  <button v-if="!jumpOpen" type="button" :aria-label="`跳转页码，当前第 ${pageIndex + 1} 页，共 ${totalPages} 页`" @click="openPageJump">…</button>
-                  <form v-else @submit.prevent="submitPageJump"><label class="sr-only" for="gallery-jump-page">跳转到第几页</label><input id="gallery-jump-page" ref="jumpInput" v-model="jumpValue"
-                                                                                                                                          type="number" min="1" :max="totalPages" inputmode="numeric"
-                                                                                                                                          @keydown.esc="jumpOpen = false"/>
-                    <button type="submit">跳转</button>
-                    <span v-if="jumpError" class="detail-page-error" role="alert">{{ jumpError }}</span></form>
-                </div>
+                <template v-for="item in paginationItems" :key="item">
+                  <button v-if="typeof item === 'number'" type="button" :aria-current="item === pageIndex + 1 ? 'page' : undefined" :aria-label="`第 ${item} 页`" @click="navigateGallery(item - 1)">{{ item }}</button>
+                  <button v-else type="button" aria-label="跳转到指定页" :aria-expanded="jumpOpen" aria-controls="gallery-page-jump" @click="openPageJump">…</button>
+                </template>
                 <button type="button" :disabled="pageIndex >= totalPages - 1" @click="navigateGallery(pageIndex + 1)">下一页</button>
-                <button type="button" :disabled="pageIndex >= totalPages - 1" @click="navigateGallery(totalPages - 1)">末页</button>
-                <span class="detail-page-status">{{ pageIndex + 1 }} / {{ totalPages }}</span>
               </nav>
+              <div v-if="jumpOpen" id="gallery-page-jump" class="detail-page-jump">
+                <form @submit.prevent="submitPageJump">
+                  <label class="sr-only" for="gallery-jump-page">跳转到第几页</label>
+                  <input id="gallery-jump-page" ref="jumpInput" v-model="jumpValue" type="number" min="1" :max="totalPages" inputmode="numeric" @keydown.esc="jumpOpen = false"/>
+                  <button type="submit">跳转</button>
+                  <button type="button" @click="jumpOpen = false">取消</button>
+                  <span v-if="jumpError" class="detail-page-error" role="alert">{{ jumpError }}</span>
+                </form>
+              </div>
             </div>
           </div>
           <div v-if="data.images.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">

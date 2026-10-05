@@ -610,7 +610,15 @@
 }
 
 .detail-page-jump {
-    position: relative
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 10;
+    padding: 10px;
+    border: 1px solid #dce5df;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 6px 18px #253b3020
 }
 
 .detail-page-jump form {
@@ -930,10 +938,26 @@
     gap: 4px
 }
 
-.detail-pages button {
+.detail-pages button,
+.detail-page-jump button {
     padding: 6px 9px;
-    font-size: 12px
+    border: 1px solid #dce5df;
+    border-radius: 7px;
+    background: #fff;
+    color: #244b43;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer
 }
+
+.detail-pages button[aria-current=page] {
+    border-color: #91b6a4;
+    background: #eaf5ee;
+    color: #17655a;
+    font-weight: 800
+}
+
+.detail-gallery-controls { position: relative; }
 
 .detail-pages span {
     font-size: 12px
