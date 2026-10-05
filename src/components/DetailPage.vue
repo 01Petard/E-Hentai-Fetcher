@@ -9,6 +9,7 @@ import UiIcon from './UiIcon.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
 import {readLoadingStyle} from '../lib/loadingStyle.js';
 import {displayImageUrl, readExEnabled, sourceUrl} from '../lib/sourceSite.js';
+import CatalogImagePreview from './CatalogImagePreview.vue';
 
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
 const data = ref(null);
@@ -28,6 +29,7 @@ const jumpInput = ref(null);
 const immersiveOpen = ref(false);
 const torrentDialog = ref(null);
 const galleryDownloadDialog = ref(null);
+const catalogPreview = ref(null);
 const cookieConfigured = ref(false);
 const catalogDownloadPending = ref({});
 const catalogDownloadErrors = ref({});
@@ -119,6 +121,7 @@ async function fetchSource(url, signal) {
 }
 
 async function load() {
+  catalogPreview.value?.close();
   loadingStyle.value = readLoadingStyle();
   const version = ++requestVersion;
   const params = new URLSearchParams(window.location.search);
@@ -391,7 +394,7 @@ onUnmounted(() => {
           </div>
           <div v-if="data.images.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">
             <div v-for="item in data.images" :key="item.url" class="detail-image-card">
-              <a class="detail-image-link" :href="localImageUrl(item.url)">
+              <a class="detail-image-link" :href="localImageUrl(item.url)" @pointerenter="catalogPreview.open(item, $event)" @pointerleave="catalogPreview.close()" @focus="catalogPreview.open(item, $event)" @blur="catalogPreview.close()" @click="catalogPreview.close()">
                 <div v-fit-sprite class="detail-sprite-frame">
                   <div class="detail-sprite" :style="{ width: item.width, height: item.height, backgroundImage: `url('${item.sprite}')`, backgroundPosition: item.position }"></div>
                 </div>
@@ -410,7 +413,9 @@ onUnmounted(() => {
               <span v-if="catalogDownloadErrors[item.number]" class="detail-image-download-error" role="alert">{{ catalogDownloadErrors[item.number] }}</span>
             </div>
           </div>
-          <p v-else>本页没有可显示的图片缩略图。</p></section>
+          <p v-else>本页没有可显示的图片缩略图。</p>
+          <CatalogImagePreview ref="catalogPreview" :fetch-source="fetchSource" :loading-style="loadingStyle"/>
+        </section>
         <details class="detail-section detail-comments" :open="!commentsCollapsed" @toggle="updateCommentsCollapsed">
           <summary><span class="detail-comments-title">评论 <small>{{ data.comments.length }} 条</small></span><span class="detail-comments-toggle">{{ commentsCollapsed ? '展开' : '收起' }}</span>
           </summary>
