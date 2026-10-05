@@ -1,9 +1,8 @@
 <script setup>
-import {computed, nextTick, onMounted, onUnmounted, ref} from 'vue';
+import {computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef} from 'vue';
 import {galleryLink, imageLink, localGalleryUrl, localImageUrl, parseGalleryDetail, parseImageDetail} from '../lib/parseDetails.js';
 import {readTagCache, refreshTagTranslations} from '../lib/tagTranslations.js';
-import ImmersiveReader from './ImmersiveReader.vue';
-import GalleryDownloadDialog from './GalleryDownloadDialog.vue';
+import {createGalleryDetailsLoader, galleryCacheScopeKey, gallerySourcePageUrl} from '../lib/galleryDetails.js';
 import TorrentDialog from './TorrentDialog.vue';
 import UiIcon from './UiIcon.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
@@ -11,11 +10,15 @@ import {readLoadingStyle} from '../lib/loadingStyle.js';
 import {displayImageUrl, readExEnabled, sourceUrl} from '../lib/sourceSite.js';
 import CatalogImagePreview from './CatalogImagePreview.vue';
 
+const ImmersiveReader = defineAsyncComponent(() => import('./ImmersiveReader.vue'));
+const GalleryDownloadDialog = shallowRef(null);
+
 const kind = window.location.pathname === '/image' ? 'image' : 'gallery';
 const data = ref(null);
 const loading = ref(true);
 const loadingStyle = ref(readLoadingStyle());
 const error = ref('');
+const catalogError = ref('');
 const source = ref('');
 const translations = ref({});
 const pageSize = ref(20);
@@ -111,6 +114,13 @@ const paginationItems = computed(() => {
   return items;
 });
 const tagCount = computed(() => data.value?.tags.reduce((sum, group) => sum + group.values.length, 0) || 0);
+const gallerySlots = computed(() => {
+  const start = pageIndex.value * pageSize.value;
+  const count = data.value ? Math.max(0, Math.min(pageSize.value, data.value.totalImages - start)) : pageSize.value;
+  const images = new Map(data.value?.images.map(image => [image.number, image]) || []);
+  return Array.from({length: count}, (_, index) => images.get(start + index + 1) || {number: start + index + 1});
+});
+
 
 function translatedTag(tag) {
   const translated = translations.value[tag.key];
@@ -123,13 +133,6 @@ function metadataValue(item) {
   if (item.label === 'Length') return item.value.replace(/\bpages?\b/i, '页');
   if (item.label === 'Favorited') return item.value.replace(/\btimes?\b/i, '次');
   return item.value;
-}
-
-function pageUrl(base, index) {
-  const url = new URL(base);
-  if (index) url.searchParams.set('p', String(index));
-  else url.searchParams.delete('p');
-  return url.href;
 }
 
 async function fetchSource(url, signal) {
@@ -145,14 +148,29 @@ async function fetchSource(url, signal) {
   return result.body;
 }
 
+const galleryLoader = createGalleryDetailsLoader({fetchPage: fetchSource, parsePage: parseGalleryDetail});
+
+async function openGalleryDownload() {
+  const gallery = data.value;
+  try {
+    if (!GalleryDownloadDialog.value) GalleryDownloadDialog.value = (await import('./GalleryDownloadDialog.vue')).default;
+    await nextTick();
+    if (data.value?.source === gallery.source) galleryDownloadDialog.value?.open(gallery);
+  } catch {
+    catalogError.value = '下载组件加载失败，请重新点击批量下载';
+  }
+}
+
 async function load() {
   catalogPreview.value?.close();
   loadingStyle.value = readLoadingStyle();
   const version = ++requestVersion;
   const params = new URLSearchParams(window.location.search);
   const target = kind === 'gallery' ? galleryLink(params.get('url')) : imageLink(params.get('url'));
-  data.value = null;
+  const sameGallery = kind === 'gallery' && target && data.value?.source === gallerySourcePageUrl(target, 0);
+  if (!sameGallery) data.value = null;
   error.value = '';
+  catalogError.value = '';
   source.value = target;
   if (!target) {
     error.value = '详情地址无效，请从搜索结果进入。';
@@ -168,37 +186,26 @@ async function load() {
         document.title = `${parsed.title} · Gallery Lens`;
       }
     } else {
-      const base = pageUrl(target, 0);
-      const first = parseGalleryDetail(await fetchSource(base), base);
-      const sourceSize = first.sourcePageSize || first.images.length || 20;
-      const sourceIndex = Number(new URL(target).searchParams.get('p'));
-      const requested = params.has('page') ? Number(params.get('page'))
-          : Number.isSafeInteger(sourceIndex) && sourceIndex > 0 ? Math.floor(sourceIndex * sourceSize / pageSize.value) : 0;
-      pageIndex.value = Number.isSafeInteger(requested) && requested >= 0 ? requested : 0;
-      const total = first.totalImages || Number(first.metadata.find(item => item.label === 'Length')?.value.match(/\d+/)?.[0]) || first.images.length;
-      pageIndex.value = Math.min(pageIndex.value, Math.max(0, Math.ceil(total / pageSize.value) - 1));
-      const start = pageIndex.value * pageSize.value;
-      const end = Math.min(total, start + pageSize.value);
-      const firstSourcePage = Math.floor(start / sourceSize);
-      const lastSourcePage = Math.floor(Math.max(start, end - 1) / sourceSize);
-      if (lastSourcePage >= first.sourcePageCount) throw new Error('源站分页页码与图片总数不一致');
-      const pages = await Promise.all(Array.from({length: lastSourcePage - firstSourcePage + 1}, (_, offset) => {
-        const index = firstSourcePage + offset;
-        return index === 0 ? Promise.resolve(first) : fetchSource(pageUrl(base, index)).then(html => parseGalleryDetail(html, pageUrl(base, index)));
-      }));
-      const images = pages.flatMap(page => page.images).filter(image => image.number > start && image.number <= end);
-      if (version === requestVersion) {
-        const firstImage = images[0]?.number;
-        const lastImage = images.at(-1)?.number;
-        data.value = {
-          ...first, images, totalImages: total,
-          imageRange: firstImage && lastImage ? `第 ${firstImage} 张到第 ${lastImage} 张 · 共 ${total} 张` : `共 ${total} 张`
-        };
-        document.title = `${first.title} · Gallery Lens`;
-      }
+      if (sameGallery) data.value = {...data.value, images: []};
+      await galleryLoader.load({
+        target, pageSize: pageSize.value,
+        requestedPage: params.has('page') ? Number(params.get('page')) : null,
+        onOverview(overview, index) {
+          if (version !== requestVersion) return;
+          pageIndex.value = index;
+          data.value = overview;
+          document.title = `${overview.title} · Gallery Lens`;
+        },
+        onImages(images) {
+          if (version === requestVersion) data.value = {...data.value, images};
+        },
+      });
     }
   } catch (failure) {
-    if (version === requestVersion) error.value = failure.message || '详情加载失败';
+    if (version === requestVersion) {
+      if (kind === 'gallery' && data.value) catalogError.value = failure.message || '图片目录加载失败';
+      else error.value = failure.message || '详情加载失败';
+    }
   } finally {
     if (version === requestVersion) loading.value = false;
   }
@@ -216,6 +223,7 @@ function navigateGallery(index) {
   jumpOpen.value = false;
   jumpError.value = '';
   window.history.pushState(null, '', galleryPageHref(index));
+  pageIndex.value = index;
   window.scrollTo(0, 0);
   load();
 }
@@ -274,7 +282,7 @@ function changePageSize() {
     localStorage.setItem('gallery-lens.gallery-page-size', String(pageSize.value));
   } catch { /* Keep this setting for the current tab. */
   }
-  const firstImage = data.value?.images[0]?.number || 1;
+  const firstImage = data.value?.imageStart || data.value?.images[0]?.number || 1;
   navigateGallery(Math.floor((firstImage - 1) / pageSize.value));
 }
 
@@ -305,7 +313,16 @@ function onKeydown(event) {
   if (event.key === 'ArrowRight' && data.value.next) navigate(data.value.next);
 }
 
+function onCacheScopeChange(event) {
+  if (event.key !== galleryCacheScopeKey && event.key !== null) return;
+  data.value = null;
+  load();
+}
+
 onMounted(async () => {
+  window.addEventListener('popstate', onPopState);
+  window.addEventListener('keydown', onKeydown);
+  window.addEventListener('storage', onCacheScopeChange);
   fetch('/api/config').then(response => response.json()).then(config => { cookieConfigured.value = Boolean(config.configured); }).catch(() => {});
   try {
     const cached = Number(localStorage.getItem('gallery-lens.gallery-page-size'));
@@ -326,14 +343,14 @@ onMounted(async () => {
     } catch { /* Show source names while translations are unavailable. */
     }
   }
-  window.addEventListener('popstate', onPopState);
-  window.addEventListener('keydown', onKeydown);
 });
 onUnmounted(() => {
+  requestVersion++;
   spriteObserver.disconnect();
   metadataObserver.disconnect();
   window.removeEventListener('popstate', onPopState);
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('storage', onCacheScopeChange);
 });
 </script>
 
@@ -343,19 +360,21 @@ onUnmounted(() => {
       <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
-      <div v-if="loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>
+      <div v-if="kind === 'image' && loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>
         <h1>正在整理{{ kind === 'gallery' ? '画廊' : '图片' }}内容…</h1></div>
       <div v-else-if="error" class="detail-state" role="alert"><h1>无法显示详情</h1>
         <p>{{ error }}</p><a href="/">返回搜索页</a></div>
-      <template v-else-if="kind === 'gallery' && data">
-        <section class="detail-overview">
+      <template v-else-if="kind === 'gallery'">
+        <section class="detail-overview" :aria-busy="!data">
+          <span v-if="!data" class="sr-only" role="status">正在加载画廊信息…</span>
           <div class="detail-overview-heading">
+            <template v-if="data">
             <div class="immersive-entry-wrap"><button type="button" class="immersive-entry" @click="immersiveOpen = true"><UiIcon name="book" :size="20"/>沉浸式浏览<UiIcon name="next" :size="17"/></button><span>全屏阅读，享受更好的浏览体验</span></div>
             <div class="detail-title-row"><span class="category">{{ categoryLabels[data.category] || data.category || '未分类' }}</span><span v-if="data.rating" class="detail-rating">★ {{
                 data.rating
               }}</span>
               <a v-if="source" class="detail-source-link" :href="source" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="14"/>原站页面</a>
-              <button class="gallery-download-entry" type="button" @click="galleryDownloadDialog.open(data)">
+              <button class="gallery-download-entry" type="button" @click="openGalleryDownload">
                 <UiIcon name="download" :size="14"/>
                 批量下载
               </button>
@@ -367,8 +386,15 @@ onUnmounted(() => {
             </div>
             <h1>{{ data.title }}</h1>
             <p v-if="data.japaneseTitle" class="detail-subtitle">{{ data.japaneseTitle }}</p>
+            </template>
+            <div v-else class="detail-heading-skeleton" aria-hidden="true">
+              <span class="detail-placeholder detail-placeholder-category"></span>
+              <span class="detail-placeholder detail-placeholder-title"></span>
+              <span class="detail-placeholder detail-placeholder-subtitle"></span>
+            </div>
           </div>
           <div class="detail-overview-body">
+            <template v-if="data">
             <div v-if="data.cover" class="detail-cover"><img :src="displayImageUrl(data.cover)" :alt="data.title"/></div>
             <div :ref="observeMetadata" class="detail-metadata-panel"><h2><UiIcon name="info" :size="20"/>基本信息</h2><dl class="detail-metadata">
               <div v-if="data.uploader">
@@ -387,19 +413,29 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
+            </template>
+            <template v-else>
+              <div class="detail-cover detail-cover-skeleton detail-placeholder" aria-hidden="true"></div>
+              <div class="detail-metadata-panel"><h2><UiIcon name="info" :size="20"/>基本信息</h2>
+                <div class="detail-metadata-skeleton" aria-hidden="true"><div v-for="row in 9" :key="row"><span class="detail-placeholder"></span><span class="detail-placeholder"></span></div></div>
+              </div>
+              <div class="detail-tags-panel"><h2><UiIcon name="tag" :size="20"/>标签</h2>
+                <div class="detail-tags-skeleton" aria-hidden="true"><span v-for="tag in 12" :key="tag" class="detail-placeholder"></span></div>
+              </div>
+            </template>
           </div>
         </section>
-        <section class="detail-section detail-catalog">
+        <section class="detail-section detail-catalog" :aria-busy="loading">
           <div class="detail-section-heading">
             <div class="detail-catalog-title">
-              <h2><UiIcon name="image" :size="23"/>图片目录 <small>{{ data.imageRange }}</small></h2>
-              <div class="detail-gallery-settings"><label for="gallery-page-size">每页数量 <select id="gallery-page-size" v-model.number="pageSize" @change="changePageSize">
+              <h2><UiIcon name="image" :size="23"/>图片目录 <small v-if="data">{{ data.imageRange }}</small></h2>
+              <div v-if="data" class="detail-gallery-settings"><label for="gallery-page-size">每页数量 <select id="gallery-page-size" v-model.number="pageSize" @change="changePageSize">
                 <option v-for="size in [20, 40, 60, 80, 100]" :key="size" :value="size">{{ size }}</option>
               </select></label><label for="gallery-columns">每行数量 <select id="gallery-columns" v-model.number="columns" @change="changeColumns">
                 <option v-for="count in [5, 6, 7, 8, 9, 10]" :key="count" :value="count">{{ count }}</option>
               </select></label></div>
             </div>
-            <div class="detail-gallery-controls">
+            <div v-if="data" class="detail-gallery-controls">
               <nav class="detail-pages" aria-label="图片目录分页">
                 <button type="button" :disabled="pageIndex === 0" @click="navigateGallery(pageIndex - 1)">上一页</button>
                 <template v-for="item in paginationItems" :key="item">
@@ -419,8 +455,11 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-if="data.images.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">
-            <div v-for="item in data.images" :key="item.url" class="detail-image-card">
+          <p v-if="catalogError" class="detail-catalog-error" role="alert">{{ catalogError }} <button type="button" @click="load">重试</button></p>
+          <p v-else-if="loading" class="sr-only" role="status">正在加载图片目录…</p>
+          <div v-if="gallerySlots.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">
+            <div v-for="item in gallerySlots" :key="item.number" class="detail-image-card" :class="{'detail-image-placeholder': !item.url}">
+              <template v-if="item.url">
               <a class="detail-image-link" :href="localImageUrl(item.url)" @pointerenter="catalogPreview.open(item, $event)" @pointerleave="catalogPreview.close()" @focus="catalogPreview.open(item, $event)" @blur="catalogPreview.close()" @click="catalogPreview.close()">
                 <div v-fit-sprite class="detail-sprite-frame">
                   <div class="detail-sprite" :style="{ width: item.width, height: item.height, backgroundImage: `url('${item.sprite}')`, backgroundPosition: item.position }"></div>
@@ -438,12 +477,18 @@ onUnmounted(() => {
                 </button>
               </div>
               <span v-if="catalogDownloadErrors[item.number]" class="detail-image-download-error" role="alert">{{ catalogDownloadErrors[item.number] }}</span>
+              </template>
+              <template v-else>
+                <div class="detail-sprite-frame detail-placeholder" aria-hidden="true"></div>
+                <span class="detail-image-number">{{ item.number }}</span>
+                <span class="detail-placeholder detail-placeholder-filename" aria-hidden="true"></span>
+              </template>
             </div>
           </div>
           <p v-else>本页没有可显示的图片缩略图。</p>
           <CatalogImagePreview ref="catalogPreview" :fetch-source="fetchSource" :loading-style="loadingStyle"/>
         </section>
-        <details class="detail-section detail-comments" :open="!commentsCollapsed" @toggle="updateCommentsCollapsed">
+        <details v-if="data" class="detail-section detail-comments" :open="!commentsCollapsed" @toggle="updateCommentsCollapsed">
           <summary><span class="detail-comments-title">评论 <small>{{ data.comments.length }} 条</small></span><span class="detail-comments-toggle">{{ commentsCollapsed ? '展开' : '收起' }}</span>
           </summary>
           <div v-if="data.comments.length" class="detail-comment-list">
@@ -484,7 +529,7 @@ onUnmounted(() => {
       </template>
     </main>
     <ImmersiveReader v-if="immersiveOpen && kind === 'gallery' && data" :gallery="data" :fetch-source="fetchSource" @close="immersiveOpen = false"/>
-    <GalleryDownloadDialog ref="galleryDownloadDialog" :fetch-source="fetchSource"/>
+    <component :is="GalleryDownloadDialog" v-if="GalleryDownloadDialog" ref="galleryDownloadDialog" :fetch-source="fetchSource"/>
     <TorrentDialog ref="torrentDialog"/>
   </div>
 </template>

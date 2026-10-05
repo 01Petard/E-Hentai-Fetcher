@@ -2247,3 +2247,64 @@
         padding: 16px 12px
     }
 }
+
+/* Reserve the existing overview and catalog layout while source pages arrive. */
+.detail-placeholder {
+    display: block;
+    background: #e7eeea;
+    border-radius: 5px
+}
+
+.detail-heading-skeleton {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-height: 99px
+}
+
+.detail-placeholder-category { width: 80px; height: 28px }
+.detail-placeholder-title { width: min(85%, 640px); height: 22px }
+.detail-placeholder-subtitle { width: min(65%, 460px); height: 16px }
+
+.detail-overview-body > .detail-cover-skeleton {
+    min-height: 260px;
+    height: auto;
+    box-shadow: none
+}
+
+.detail-metadata-skeleton { display: grid; gap: 12px }
+.detail-metadata-skeleton > div { display: grid; grid-template-columns: 80px 1fr; gap: 18px }
+.detail-metadata-skeleton .detail-placeholder { height: 16px }
+.detail-tags-skeleton { display: flex; flex-wrap: wrap; align-content: start; gap: 10px }
+.detail-tags-skeleton .detail-placeholder { width: 90px; height: 28px; border-radius: 14px }
+.detail-tags-skeleton .detail-placeholder:nth-child(3n) { width: 65px }
+.detail-placeholder-filename { height: 12px; margin: 4px 11px 30px }
+.detail-catalog .detail-image-placeholder:hover { border-color: #e1e8e2 }
+
+.detail-catalog-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    color: #9b3527;
+    font-size: 13px
+}
+
+.detail-catalog-error button {
+    padding: 6px 12px;
+    border: 1px solid #dce5df;
+    border-radius: 7px;
+    background: #fff;
+    color: #17655a;
+    font: inherit;
+    cursor: pointer
+}
+
+@media (max-width: 700px) {
+    .detail-overview-body > .detail-cover-skeleton { min-height: 180px }
+    .detail-metadata-skeleton > div { grid-template-columns: 1fr; gap: 4px }
+    .detail-heading-skeleton { min-height: 220px }
+    .detail-metadata-skeleton { gap: 14px }
+    .detail-metadata-skeleton .detail-placeholder { height: 11px }
+    .detail-metadata-skeleton .detail-placeholder:first-child { width: 60% }
+}

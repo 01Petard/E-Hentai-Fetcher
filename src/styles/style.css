@@ -2501,3 +2501,37 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
         width: 34px;
     }
 }
+
+/* Use the active result layout so initial loading reserves the same columns. */
+.search-placeholder {
+    display: block;
+    min-width: 0;
+    border-radius: 5px;
+    background: #e7eeea
+}
+
+.search-placeholder-chip { width: 58px; max-width: 85%; height: 18px }
+.search-placeholder-date { width: 85px; max-width: 90%; height: 14px }
+.search-placeholder-line { width: 70%; height: 12px }
+.search-skeleton .search-placeholder-title { width: 85%; min-height: 32px; height: 32px; margin-bottom: 10px }
+.search-skeleton .gallery-item { pointer-events: none }
+.search-skeleton .item-image { border: 0 }
+.search-skeleton .item-details { min-height: 29px }
+.search-skeleton.minimal .gallery-item { min-height: 64px }
+.search-skeleton.minimal .search-placeholder-title { min-height: 16px; height: 16px; margin-bottom: 8px }
+
+.search-loading-note {
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 8px;
+    background: #edf4ef;
+    color: #52665a;
+    font-size: 13px
+}
+
+@media (max-width: 700px) {
+    .search-skeleton.minimal .gallery-item > .search-placeholder-date,
+    .search-skeleton.minimal .gallery-item > .search-placeholder-chip:nth-child(3) { display: none }
+    .search-skeleton.minimal .minimal-content { grid-column: 2; grid-row: 1 }
+    .search-skeleton.minimal .gallery-item > .search-placeholder-chip:last-child { grid-column: 3; grid-row: 1 }
+}

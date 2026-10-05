@@ -1,15 +1,18 @@
 <script setup>
-import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch} from 'vue';
 import {buildSearchUrl} from './lib/search.js';
 import {parseGallery} from './lib/parseGallery.js';
+import {browserSearchResultsLoader} from './lib/searchResults.js';
+import {buildTagSearchIndex} from './lib/tagSearchIndex.js';
+import SearchSkeleton from './components/SearchSkeleton.vue';
 import {localGalleryUrl} from './lib/parseDetails.js';
+import {galleryCacheScopeKey, invalidateGalleryDetails} from './lib/galleryDetails.js';
 import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
 import TorrentDialog from './components/TorrentDialog.vue';
 import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
 import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
-import LoadingIndicator from './components/LoadingIndicator.vue';
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 
 const searchText = ref('');
@@ -42,11 +45,14 @@ const filters = reactive({
   f_sft: false,
 });
 const view = ref('thumbnail');
-const loading = ref(false);
+const loading = ref(true);
 const result = ref(null);
-const tagTranslations = ref({});
-const tagDetails = ref({});
-const tagSearchIndex = ref([]);
+const tagTranslations = shallowRef({});
+const tagDetails = shallowRef({});
+const tagSearchIndex = shallowRef([]);
+let tagIndexVersion = 0;
+let disposed = false;
+const loadedUrl = ref('');
 let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
@@ -82,6 +88,7 @@ const resultsHeading = ref(null);
 const searchInput = ref(null);
 const torrentDialog = ref(null);
 let searchVersion = 0;
+let configVersion = 0;
 const postedFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
@@ -130,7 +137,7 @@ function tagText(tag) {
   return tagTextCache.get(tag.key);
 }
 
-async function enrichPostedTimes(parsed, version) {
+async function enrichPostedTimes(parsed, version, target) {
   const galleries = parsed.items.flatMap((item, index) => {
     const match = item.url && new URL(item.url).pathname.match(/^\/g\/(\d+)\/([a-f0-9]{10})\/?$/i);
     return match ? [{ gid: Number(match[1]), token: match[2], index }] : [];
@@ -155,19 +162,27 @@ async function enrichPostedTimes(parsed, version) {
       }
     } catch { return; }
   }
+  if (version === searchVersion && !disposed && result.value) {
+    result.value.postedEnriched = true;
+    searchLoader.update(target, result.value);
+  }
 }
 
 function plainText(html) {
-  return new DOMParser().parseFromString(html || '', 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
+  const text = String(html || '');
+  if (!/[<&]/.test(text)) return text.replace(/\s+/g, ' ').trim();
+  return new DOMParser().parseFromString(text, 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
 }
 
 function applyTagData(data) {
+  if (disposed) return;
   tagTranslations.value = data.translations || {};
   tagDetails.value = data.details || {};
   tagTextCache = new Map();
-  tagSearchIndex.value = Object.entries(tagTranslations.value).map(([key, value]) => {
-    const name = plainText(value);
-    return { key, name, keyLower: key.toLowerCase(), nameLower: name.toLowerCase() };
+  const version = ++tagIndexVersion;
+  tagSearchIndex.value = [];
+  void buildTagSearchIndex(tagTranslations.value, {plainText, isCurrent: () => !disposed && version === tagIndexVersion}).then(index => {
+    if (index && !disposed && version === tagIndexVersion) tagSearchIndex.value = index;
   });
   tagUpdate.sha = data.sha || '';
   tagUpdate.checkedAt = data.checkedAt || 0;
@@ -353,15 +368,16 @@ function saveSearchSession() {
 }
 
 watch([searchText, filters, view, requestUrl, activeQuickLink, pageIndex, pageSize], saveSearchSession,
-  { deep: true, flush: 'sync' });
+  { deep: true });
 
 async function loadConfig() {
+  const version = ++configVersion;
   try {
     const response = await fetch('/api/config');
     const data = await response.json();
-    cookieConfigured.value = Boolean(data.configured);
+    if (!disposed && version === configVersion) cookieConfigured.value = Boolean(data.configured);
   } catch {
-    cookieConfigured.value = false;
+    if (!disposed && version === configVersion) cookieConfigured.value = false;
   }
 }
 
@@ -530,6 +546,10 @@ async function saveCookie() {
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '保存失败');
+    invalidateGalleryDetails();
+    ++configVersion;
+    result.value = null;
+    loadedUrl.value = '';
     cookieConfigured.value = true;
     cookieDraft.value = '';
     settingsDialog.value.close();
@@ -552,6 +572,11 @@ async function clearCookie() {
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '清理失败');
+    invalidateGalleryDetails();
+    ++configVersion;
+    ++searchVersion;
+    loading.value = false;
+    loadedUrl.value = '';
     cookieConfigured.value = Boolean(data.configured);
     cookieDraft.value = '';
     result.value = null;
@@ -600,46 +625,69 @@ async function resetSettings() {
   resettingSettings.value = false;
 }
 
-async function runSearch(url, targetIndex = null) {
+const searchLoader = browserSearchResultsLoader(async target => {
+  const response = await fetch('/fetch', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url: target, userAgent: navigator.userAgent, extended: true}),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || '本地请求失败');
+  const html = typeof data.body === 'string' ? data.body : '';
+  if (data.status !== 200) {
+    const failure = new Error(`目标站点返回 HTTP ${data.status} ${data.reason || ''}。可在下方查看原始 HTML。`);
+    failure.rawResponse = html;
+    throw failure;
+  }
+  const parsed = parseGallery(html, target);
+  if (!parsed.hasTable) {
+    const failure = new Error('响应中没有 Extended 结果表格，可在下方查看原始 HTML。');
+    failure.rawResponse = html;
+    throw failure;
+  }
+  return parsed;
+});
+
+async function runSearch(url, targetIndex = null, options = {}) {
   const version = ++searchVersion;
   const target = sourceUrl(url, preferences.useEx);
   error.value = '';
-  result.value = null;
   rawResponse.value = '';
   requestUrl.value = target;
-  if (!target) {
-    error.value = '请求地址无效';
+  if (!target || !cookieConfigured.value) {
+    result.value = null;
+    loading.value = false;
+    error.value = target ? '请先在配置菜单中保存 Cookie。' : '请求地址无效';
     return;
   }
-  if (!cookieConfigured.value) {
-    error.value = '请先在配置菜单中保存 Cookie。';
-    return;
-  }
+  if (loadedUrl.value && new URL(loadedUrl.value).hostname !== new URL(target).hostname) result.value = null;
   loading.value = true;
   try {
-    const response = await fetch('/fetch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: target, userAgent: navigator.userAgent, extended: true }),
-    });
-    const data = await response.json();
-    if (version !== searchVersion) return;
-    if (!response.ok) throw new Error(data.error || '本地请求失败');
-    rawResponse.value = typeof data.body === 'string' ? data.body : '';
-    if (data.status !== 200) throw new Error(`目标站点返回 HTTP ${data.status} ${data.reason || ''}。可在下方查看原始 HTML。`);
-    const parsed = parseGallery(data.body, target);
-    if (!parsed.hasTable) throw new Error('响应中没有 Extended 结果表格，可在下方查看原始 HTML。');
+    const {result: parsed} = await searchLoader.load(target, options);
+    if (version !== searchVersion || disposed) return;
     result.value = parsed;
+    loadedUrl.value = target;
     if (!parsed.pages.prev || !pageSize.value) pageSize.value = parsed.items.length;
     pageIndex.value = !parsed.pages.prev ? 0 : !parsed.pages.next && parsed.total && pageSize.value
       ? Math.ceil(parsed.total / pageSize.value) - 1 : targetIndex;
-    rawResponse.value = '';
-    void enrichPostedTimes(parsed, version);
+    if (!parsed.postedEnriched) void enrichPostedTimes(parsed, version, target);
   } catch (failure) {
-    if (version === searchVersion) error.value = failure.message || '请求失败';
+    if (version === searchVersion && !disposed) {
+      error.value = failure.message || '请求失败';
+      rawResponse.value = failure.rawResponse || '';
+    }
   } finally {
-    if (version === searchVersion) loading.value = false;
+    if (version === searchVersion && !disposed) loading.value = false;
   }
+}
+
+async function onCacheScopeChange(event) {
+  if (event.key !== galleryCacheScopeKey && event.key !== null) return;
+  ++searchVersion;
+  result.value = null;
+  loadedUrl.value = '';
+  loading.value = true;
+  await loadConfig();
+  if (!disposed) void runSearch(requestUrl.value || siteHomeUrl.value, pageIndex.value);
 }
 
 function goHome() {
@@ -705,6 +753,7 @@ function navigate(page) {
 }
 
 onMounted(async () => {
+  const configRequest = loadConfig();
   const pageReload = isPageReload();
   if (pageReload) {
     try { sessionStorage.removeItem(searchSessionKey); } catch { /* The reload still starts from the site home. */ }
@@ -734,12 +783,17 @@ onMounted(async () => {
   } catch { /* Invalid saved state falls back to the default gallery page. */ }
   searchSessionReady = true;
   window.addEventListener('pagehide', saveSearchSession);
-  try {
-    const saved = serverQuickLinks
-      ? (await (await fetch('/api/quick-links')).json()).links
-      : JSON.parse(localStorage.getItem(quickLinksStorageKey));
-    if (Array.isArray(saved)) quickLinks.value = normalizeQuickLinks(saved, true);
-  } catch { /* Keep the quick links empty if local configuration is invalid. */ }
+  window.addEventListener('storage', onCacheScopeChange);
+  if (serverQuickLinks) {
+    void fetch('/api/quick-links').then(response => response.json()).then(data => {
+      if (!disposed && Array.isArray(data.links)) quickLinks.value = normalizeQuickLinks(data.links, true);
+    }).catch(() => {});
+  } else {
+    try {
+      const saved = JSON.parse(localStorage.getItem(quickLinksStorageKey));
+      if (Array.isArray(saved)) quickLinks.value = normalizeQuickLinks(saved, true);
+    } catch { /* Keep the quick links empty if local configuration is invalid. */ }
+  }
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
@@ -767,14 +821,16 @@ onMounted(async () => {
     } catch { /* Ignore invalid uploader links. */
     }
   }
-  await loadConfig();
-  void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, pageIndex.value);
+  void configRequest.then(() => {
+    if (!disposed) void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, pageIndex.value, {force: pageReload});
+  });
   if (currentUrl.searchParams.get('settings') === '1') {
     openSettings();
     currentUrl.searchParams.delete('settings');
     window.history.replaceState(null, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
   }
   const cached = await readTagCache();
+  if (disposed) return;
   if (cached) applyTagData(cached);
   if (preferences.autoUpdate || !cached) updateTagData();
   maintenanceTimer = window.setInterval(() => {
@@ -786,11 +842,15 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  disposed = true;
+  ++searchVersion;
+  ++tagIndexVersion;
   unsubscribeImmersiveCache?.();
   window.clearInterval(maintenanceTimer);
   document.removeEventListener('pointerdown', closeTagPopoverOnOutsideClick);
   window.removeEventListener('resize', closeTagPopover);
   window.removeEventListener('pagehide', saveSearchSession);
+  window.removeEventListener('storage', onCacheScopeChange);
 });
 </script>
 
@@ -864,10 +924,10 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section class="results-section" aria-labelledby="results-title">
+      <section class="results-section" aria-labelledby="results-title" :aria-busy="loading">
         <div ref="resultsHeading" class="results-heading">
           <div><h2 id="results-title">搜索结果 <span v-if="result?.total !== null && result" class="total-pill">{{ result.approximate ? '约 ' : '' }}{{ result.total.toLocaleString() }} 条</span></h2><small v-if="result" class="page-count">本页 {{ result.items.length }} 个条目<span v-if="activeQuickLink"> · {{ activeQuickLink }}</span></small></div>
-          <nav v-if="result" class="pagination" aria-label="上方分页"><button v-for="page in paginationOptions.slice(0, 2)" :key="page.key" type="button" :disabled="!result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button><span class="pagination-current" aria-live="polite">{{ pageIndex === null ? '–' : pageIndex + 1 }}<template v-if="result.total && pageSize"> / {{ Math.ceil(result.total / pageSize) }}</template></span><button v-for="page in paginationOptions.slice(2)" :key="page.key" type="button" :disabled="!result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button></nav>
+          <nav v-if="result" class="pagination" aria-label="上方分页"><button v-for="page in paginationOptions.slice(0, 2)" :key="page.key" type="button" :disabled="loading || !result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button><span class="pagination-current" aria-live="polite">{{ pageIndex === null ? '–' : pageIndex + 1 }}<template v-if="result.total && pageSize"> / {{ Math.ceil(result.total / pageSize) }}</template></span><button v-for="page in paginationOptions.slice(2)" :key="page.key" type="button" :disabled="loading || !result.pages[page.key]" :aria-label="page.label" :title="page.label" @click="navigate(page.key)"><UiIcon :name="page.icon" :size="15" /></button></nav>
           <div class="view-switch" role="group" aria-label="展示形式">
               <button type="button" :aria-pressed="view === 'thumbnail'" aria-label="缩略图模式" @click="view = 'thumbnail'"><UiIcon name="grid" :size="16" /> <span>缩略图</span></button>
               <button type="button" :aria-pressed="view === 'extended'" aria-label="扩展模式" @click="view = 'extended'"><UiIcon name="list" :size="17" /> <span>扩展</span></button>
@@ -881,10 +941,11 @@ onUnmounted(() => {
           <span class="page-position-note">{{ pagePosition.label }} · 按结果总数估算</span>
         </div>
 
-        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>暂时无法展示结果</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><a href="/debug"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
-        <div v-else-if="loading" class="message loading-message" role="status"><LoadingIndicator :variant="preferences.loadingStyle"/><strong>正在获取并解析图库…</strong><p class="request-address">{{ requestUrl }}</p></div>
-        <div v-else-if="!result" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>从一次搜索开始</strong><p>输入关键词，按需调整高级筛选，结果会显示在这里。</p></div>
-        <template v-else>
+        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>{{ result ? '新结果加载失败，仍显示上次结果' : '暂时无法展示结果' }}</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><button v-if="cookieConfigured" type="button" @click="runSearch(requestUrl, pageIndex, {force: true})">重试</button><a href="/debug"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
+        <p v-if="loading && result" class="search-loading-note" role="status">正在加载新结果，当前显示上次结果…</p>
+        <SearchSkeleton v-if="loading && !result" :view="view"/>
+        <div v-else-if="!result && !error" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>从一次搜索开始</strong><p>输入关键词，按需调整高级筛选，结果会显示在这里。</p></div>
+        <template v-else-if="result">
           <div v-if="!result.items.length" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>没有找到匹配的图库</strong><p>换个关键词或放宽筛选条件试试。</p></div>
           <div v-else class="gallery" :class="view">
             <div v-if="view === 'minimal'" class="minimal-header" aria-hidden="true"><span>类型</span><span>日期</span><span>评分 / 种子</span><span>标题 / 关键信息</span><span>页数</span></div>

@@ -16,19 +16,31 @@ let tagDatabaseCache;
 let tagDatabaseRequest;
 const sessionCookies = createSessionCookieJar();
 const quickLinksFile = process.env.QUICK_LINKS_FILE;
+const proxyAgents = new Map();
+let systemProxyAddress;
+let systemProxyCheckedAt = 0;
 
 function proxyAgent() {
-  const configured = process.env.HTTPS_PROXY || process.env.https_proxy;
-  if (configured) return new HttpsProxyAgent(configured);
-  if (process.platform !== 'darwin') return undefined;
-  try {
-    const settings = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 2000 });
-    if (!/^\s*HTTPSEnable\s*:\s*1\s*$/m.test(settings)) return undefined;
-    const host = /^\s*HTTPSProxy\s*:\s*(\S+)\s*$/m.exec(settings)?.[1];
-    const port = /^\s*HTTPSPort\s*:\s*(\d+)\s*$/m.exec(settings)?.[1];
-    if (host && port) return new HttpsProxyAgent(`http://${host}:${port}`);
-  } catch { /* Direct connection remains available when system proxy lookup fails. */ }
-  return undefined;
+  let address = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (!address && process.platform === 'darwin') {
+    if (Date.now() - systemProxyCheckedAt > 30000) {
+      systemProxyCheckedAt = Date.now();
+      systemProxyAddress = undefined;
+      try {
+        const settings = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 2000 });
+        const enabled = /^\s*HTTPSEnable\s*:\s*1\s*$/m.test(settings);
+        const host = /^\s*HTTPSProxy\s*:\s*(\S+)\s*$/m.exec(settings)?.[1];
+        const port = /^\s*HTTPSPort\s*:\s*(\d+)\s*$/m.exec(settings)?.[1];
+        if (enabled && host && port) systemProxyAddress = `http://${host}:${port}`;
+      } catch { /* Direct connection remains available when system proxy lookup fails. */ }
+    }
+    address = systemProxyAddress;
+  }
+  if (!address) return undefined;
+  if (!proxyAgents.has(address)) {
+    proxyAgents.set(address, new HttpsProxyAgent(address, {keepAlive: true, maxSockets: 8, maxFreeSockets: 4, timeout: 30000}));
+  }
+  return proxyAgents.get(address);
 }
 
 function sendJson(response, status, data) {
@@ -216,6 +228,7 @@ function fetchTorrent(url, userAgent, site = 'e-hentai.org', cookie = '', redire
 function fetchHtml(url, headers, body = null) {
   const target = new URL(url);
   const cookie = headers.Cookie ? sessionCookies.mergeCookie(target.hostname, headers.Cookie) : '';
+  const startedAt = performance.now();
   return new Promise((resolve, reject) => {
     const upstream = httpsRequest(target, {
       method: body === null ? 'GET' : 'POST',
@@ -223,6 +236,7 @@ function fetchHtml(url, headers, body = null) {
       timeout: 25000,
       agent: proxyAgent(),
     }, response => {
+      const headersAt = performance.now();
       const chunks = [];
       let size = 0;
       response.on('data', chunk => {
@@ -248,6 +262,7 @@ function fetchHtml(url, headers, body = null) {
           reason: response.statusMessage,
           headers: response.headers,
           body,
+          timing: {headers: headersAt - startedAt, body: performance.now() - headersAt},
         });
       });
     });
@@ -517,6 +532,8 @@ async function route(request, response) {
       'User-Agent': payload.userAgent,
     });
     if (isExSessionRejected(target.hostname, result)) throw new Error(exSessionMessage);
+    response.setHeader('Server-Timing', `upstream_headers;dur=${result.timing.headers.toFixed(1)}, upstream_body;dur=${result.timing.body.toFixed(1)}`);
+    delete result.timing;
     sendJson(response, 200, result);
     return;
   }
