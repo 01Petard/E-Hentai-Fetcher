@@ -18,6 +18,22 @@ test('EX preference switches search, saved links, and pagination to the selected
     'https://ehgt.org/w/01/636/72010-6squz2dd.webp');
 });
 
+test('quick navigation changes only the source host and preserves search and uploader URLs', () => {
+  for (const path of [
+    '/?f_search=AHY',
+    '/?f_search=f%3A%22big+breasts%24%22&advsearch=1&f_srdd=4&next=123',
+    '/uploader/%E6%B5%8B%E8%AF%95?p=2',
+  ]) {
+    assert.equal(sourceUrl(path, true), `https://exhentai.org${path}`);
+    assert.equal(sourceUrl(path, false), `https://e-hentai.org${path}`);
+    for (const host of ['e-hentai.org', 'exhentai.org']) {
+      const saved = `https://${host}${path}`;
+      assert.equal(sourceUrl(saved, true), `https://exhentai.org${path}`);
+      assert.equal(sourceUrl(saved, false), `https://e-hentai.org${path}`);
+    }
+  }
+});
+
 test('proxy accepts EX addresses while rejecting other hosts', async () => {
   const server = createServer((request, response) => handleApiRequest(request, response));
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

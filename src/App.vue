@@ -18,6 +18,7 @@ const quickLinkDrafts = ref([]);
 const quickLinkError = ref('');
 const quickLinkMessage = ref('');
 const quickLinkImportInput = ref(null);
+const settingsView = ref('settings');
 const draggingQuickLink = ref(null);
 let quickLinkDraftId = 0;
 let quickLinkDragPreview = null;
@@ -364,7 +365,8 @@ async function loadConfig() {
   }
 }
 
-function openSettings() {
+function openSettings(view = 'settings') {
+  settingsView.value = view === 'quick-links' ? 'quick-links' : 'settings';
   configError.value = '';
   configMessage.value = '';
   cookieDraft.value = '';
@@ -383,13 +385,13 @@ function openSettings() {
 function normalizeQuickLink(item) {
   const label = typeof item?.label === 'string' ? item.label.trim() : '';
   const address = typeof item?.url === 'string' ? item.url.trim() : '';
-  if (!label || !address) throw new Error('每个快捷链接都需要名称和完整地址');
+  if (!label || !address) throw new Error('每个快捷链接都需要名称和地址');
   let url;
-  try { url = new URL(address); } catch { throw new Error(`“${label}”的地址无效`); }
+  try { url = /^(?:\/(?!\/)|\?)/.test(address) ? new URL(address, sourceOrigin()) : new URL(address); } catch { throw new Error(`“${label}”的地址无效`); }
   if (url.protocol !== 'https:' || !sourceHosts.includes(url.hostname) || url.username || url.password || url.hash || (url.port && url.port !== '443')) {
-    throw new Error(`“${label}”只能使用 E-Hentai 或 ExHentai 的 HTTPS 地址`);
+    throw new Error(`“${label}”请填写路径和查询参数，或 E-Hentai / ExHentai 的 HTTPS 完整地址`);
   }
-  return { label, url: url.href };
+  return { label, url: url.pathname + url.search };
 }
 
 function normalizeQuickLinks(items, useSortOrder = false) {
@@ -409,8 +411,10 @@ function moveQuickLink(from, to) {
   quickLinkDrafts.value.splice(to, 0, quickLinkDrafts.value.splice(from, 1)[0]);
 }
 
-function addQuickLink() {
+async function addQuickLink() {
   quickLinkDrafts.value.push({ label: '', url: '', dragId: ++quickLinkDraftId });
+  await nextTick();
+  settingsDialog.value.querySelector('.quick-link-editor:last-child .quick-link-name')?.focus();
 }
 
 function startQuickLinkDrag(event, index) {
@@ -465,7 +469,7 @@ async function saveQuickLinks() {
       if (!response.ok) throw new Error((await response.json()).error || '保存快捷链接失败');
     } else localStorage.setItem(quickLinksStorageKey, JSON.stringify(links));
     quickLinks.value = links;
-    settingsDialog.value.close();
+    settingsView.value = 'settings';
   } catch (failure) {
     quickLinkError.value = failure.message || '保存快捷链接失败';
   }
@@ -496,7 +500,7 @@ function exportQuickLinks() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(links, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'gallery-lens-quick-links.json';
+    anchor.download = 'quick-navigation.json';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -682,10 +686,12 @@ function submitSearch() {
 
 function openQuickLink(item) {
   if (loading.value) return;
+  const target = sourceUrl(item.url, preferences.useEx);
+  if (!target) return;
   activeQuickLink.value = item.label;
   pageSize.value = 0;
-  const url = new URL(item.url);
-  runSearch(item.url, url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0);
+  const url = new URL(target);
+  runSearch(target, url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0);
   resultsHeading.value?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
@@ -827,9 +833,9 @@ onUnmounted(() => {
         <nav class="quick-searches" aria-label="快速导航">
           <span class="quick-search-label"><UiIcon name="bookmark" :size="15" /> 快速导航</span>
           <div class="quick-search-list">
-            <button v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" type="button" :disabled="loading" :title="item.url" :aria-pressed="activeQuickLink === item.label" @click="openQuickLink(item)">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></button>
+            <button v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" type="button" :disabled="loading" :title="sourceUrl(item.url, preferences.useEx)" :aria-pressed="activeQuickLink === item.label" @click="openQuickLink(item)">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></button>
           </div>
-          <button class="quick-search-edit" type="button" @click="openSettings">编辑</button>
+          <button class="quick-search-edit" type="button" @click="openSettings('quick-links')">编辑</button>
           <span id="search-help" class="cookie-state"><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? 'Cookie 已配置' : 'Cookie 未配置' }}</span>
         </nav>
         <div v-show="filters.advanced" id="advanced-panel" class="advanced-panel">
@@ -954,8 +960,9 @@ onUnmounted(() => {
 
     <TorrentDialog ref="torrentDialog"/>
 
-    <dialog ref="settingsDialog" class="settings-dialog" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag">
-      <div class="dialog-content"><div class="dialog-heading"><h2>配置中心</h2><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
+    <dialog ref="settingsDialog" class="settings-dialog" :class="{ 'quick-links-dialog': settingsView === 'quick-links' }" aria-labelledby="settings-title" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag">
+      <div class="dialog-content"><div class="dialog-heading"><h2 id="settings-title">{{ settingsView === 'quick-links' ? '快捷导航' : '配置中心' }}</h2><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
+        <template v-if="settingsView === 'settings'">
         <section class="feature-settings" aria-labelledby="feature-settings-title"><h3 id="feature-settings-title">浏览体验</h3>
           <div class="feature-switches">
             <label><input v-model="preferences.translateTags" type="checkbox" /> 标签汉化</label>
@@ -980,24 +987,42 @@ onUnmounted(() => {
           </div>
           <p v-if="tagUpdate.error" class="form-error" role="alert">{{ tagUpdate.error }}{{ tagUpdate.sha ? '；已缓存的标签仍可使用。' : '；请稍后重试。' }}</p><p v-else-if="tagUpdate.message" class="tag-update-message" role="status">{{ tagUpdate.message }}</p>
         </section>
-        <section class="quick-link-settings" aria-labelledby="quick-link-settings-title"><h3 id="quick-link-settings-title">快捷链接</h3><p>保存完整地址，点击快捷项时由本地服务请求并解析。</p>
-          <form @submit.prevent="saveQuickLinks">
-            <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
-              <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
-                <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
-                <input v-model="item.label" type="text" :aria-label="`第 ${index + 1} 项名称`" placeholder="名称" />
-                <input v-model="item.url" type="url" :aria-label="`第 ${index + 1} 项地址`" placeholder="https://e-hentai.org/..." />
-                <button type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
-              </div>
-            </TransitionGroup>
-            <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p><input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" /><div class="quick-link-actions"><div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div><button class="settings-action-button" type="submit">保存快捷链接</button></div>
-          </form>
+        <section class="quick-link-settings quick-link-entry" aria-label="快捷导航设置">
+          <div><h3>快捷导航</h3><p>已保存 {{ quickLinks.length }} 项</p></div>
+          <button class="settings-action-button" type="button" @click="settingsView = 'quick-links'">管理 <UiIcon name="arrow-right" :size="14" /></button>
         </section>
         <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
         <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
         <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><p v-else-if="configMessage" class="settings-message" role="status">{{ configMessage }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><div><button class="settings-action-button" type="button" :disabled="clearingCookie || savingCookie || !cookieConfigured" @click="clearCookie">{{ clearingCookie ? '清理中…' : '清理 Cookie' }}</button><button class="settings-action-button" type="submit" :disabled="savingCookie || clearingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}</button></div></div></form>
         <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie" @click="resetSettings">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div>
         </section>
+        </template>
+        <form v-else class="quick-link-manager" @submit.prevent="saveQuickLinks">
+          <div class="quick-link-toolbar">
+            <button class="settings-action-button" type="button" @click="settingsView = 'settings'; stopQuickLinkDrag()">返回配置</button>
+            <div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div>
+          </div>
+          <p class="quick-link-manager-note">填写路径和查询参数，完整链接会自动去掉域名。访问时跟随 EX 模式切换站点。</p>
+          <div class="quick-link-scroll">
+            <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
+              <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
+                <div class="quick-link-row">
+                  <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置，上下方向键排序`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
+                  <input v-model="item.label" class="quick-link-name" type="text" :aria-label="`第 ${index + 1} 项名称`" :title="item.label" placeholder="名称" />
+                  <div class="quick-link-url"><span class="quick-link-base">{{ sourceOrigin(preferences.useEx) }}</span><input v-model="item.url" class="quick-link-address" type="text" :aria-label="`第 ${index + 1} 项地址`" :title="item.url" placeholder="/?f_search=AHY" /></div>
+                  <button class="quick-link-delete" type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
+                </div>
+
+              </div>
+            </TransitionGroup>
+            <p v-if="!quickLinkDrafts.length" class="quick-link-empty">暂无快捷导航，添加链接或导入 JSON 开始配置。</p>
+          </div>
+          <div class="quick-link-manager-footer">
+            <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p>
+            <div><span>{{ quickLinkDrafts.length }} 项 · 修改后需保存生效</span><button class="settings-action-button" type="submit">保存快捷链接</button></div>
+          </div>
+          <input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" />
+        </form>
       </div>
     </dialog>
   </div>

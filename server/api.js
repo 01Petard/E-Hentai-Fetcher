@@ -360,7 +360,7 @@ async function route(request, response) {
         if (typeof item?.label !== 'string' || !item.label.trim() || item.label.length > 200 || typeof item.url !== 'string' ||
             (item.sortOrder !== undefined && (!Number.isSafeInteger(item.sortOrder) || item.sortOrder < 1))) return true;
         try {
-          const url = new URL(item.url);
+          const url = /^\/(?!\/)/.test(item.url) ? new URL(item.url, 'https://e-hentai.org') : new URL(item.url);
           return url.protocol !== 'https:' || !['e-hentai.org', 'exhentai.org'].includes(url.hostname) ||
             Boolean(url.username || url.password || url.hash || (url.port && url.port !== '443'));
         } catch { return true; }
