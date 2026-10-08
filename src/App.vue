@@ -742,7 +742,6 @@ function openQuickLink(item) {
   pageSize.value = 0;
   const url = new URL(target);
   runSearch(target, url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0);
-  resultsHeading.value?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function navigate(page) {
