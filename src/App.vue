@@ -14,6 +14,7 @@ import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} fr
 import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
+import {privacyMode} from './lib/privacyMode.js';
 
 const searchText = ref('');
 const quickLinks = ref([]);
@@ -57,8 +58,9 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false };
-const preferences = reactive({...defaultPreferences});
+const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false, privacyMode: false };
+const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value});
+watch(() => preferences.privacyMode, value => { privacyMode.value = value; }, {flush: 'sync'});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
 const suggestionOpen = ref(false);
@@ -797,7 +799,7 @@ onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
-      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap', 'useEx']) {
+      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap', 'useEx', 'privacyMode']) {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
@@ -1030,7 +1032,9 @@ onUnmounted(() => {
             <label><input v-model="preferences.tagDetails" type="checkbox" /> 标签详情</label>
             <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
             <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
+            <label><input v-model="preferences.privacyMode" type="checkbox" /> 隐私模式</label>
           </div>
+          <p class="form-hint">隐私模式下所有图片默认模糊，悬停 500ms 后显示清晰图片，移开后恢复模糊；悬浮预览额外等待 500ms。</p>
           <div class="loading-style-setting"><label for="loading-style">加载动画</label><select id="loading-style" v-model="preferences.loadingStyle"><option v-for="option in loadingStyleOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
           <label class="source-site-setting"><input v-model="preferences.useEx" type="checkbox"/> 启用 EX（ExHentai）</label>
           <h3>沉浸式浏览</h3>

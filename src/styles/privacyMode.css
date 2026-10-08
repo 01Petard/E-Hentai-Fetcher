@@ -1,0 +1,15 @@
+/* Cover images, readers, teleported previews and sprite-based catalog thumbnails. */
+.privacy-mode img, .privacy-mode .detail-sprite { filter: blur(16px); }
+.privacy-mode img[data-privacy-revealed] { filter: none; }
+
+@keyframes privacy-reveal {
+    to { filter: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .privacy-mode img:hover,
+    .privacy-mode .detail-sprite-frame:hover .detail-sprite,
+    .privacy-mode .minimal-content:hover .minimal-preview img {
+        animation: privacy-reveal 0s 500ms forwards;
+    }
+}

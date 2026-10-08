@@ -1,5 +1,6 @@
 <script setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue';
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
+import {privacyMode} from '../lib/privacyMode.js';
 import {parseImageDetail} from '../lib/parseDetails.js';
 import {displayImageUrl} from '../lib/sourceSite.js';
 import LoadingIndicator from './LoadingIndicator.vue';
@@ -8,6 +9,7 @@ const props = defineProps({fetchSource: {type: Function, required: true}, loadin
 const preview = ref(null);
 const cache = new Map();
 let timer;
+let revealTimer;
 let controller;
 let version = 0;
 
@@ -19,8 +21,9 @@ const previewStyle = computed(() => {
   const availableRight = window.innerWidth - rect.right - gap - margin;
   const availableLeft = rect.left - gap - margin;
   const sideWidth = Math.max(availableRight, availableLeft);
-  const maxWidth = Math.min(420, window.innerWidth - margin * 2 - 24, sideWidth >= 240 ? sideWidth - 24 : 420);
-  const maxHeight = Math.min(680, window.innerHeight - margin * 2 - 64);
+  const enlargement = 1.5;
+  const maxWidth = Math.min(420 * enlargement, window.innerWidth - margin * 2 - 24, sideWidth >= 240 ? sideWidth - 24 : 420 * enlargement);
+  const maxHeight = Math.min(680 * enlargement, window.innerHeight - margin * 2 - 64);
   const width = detail?.width || parseFloat(item.width) || 200;
   const height = detail?.height || parseFloat(item.height) || 280;
   const scale = Math.min(maxWidth / width, maxHeight / height);
@@ -38,6 +41,7 @@ const previewStyle = computed(() => {
 function close() {
   version++;
   clearTimeout(timer);
+  clearTimeout(revealTimer);
   controller?.abort();
   controller = null;
   preview.value = null;
@@ -50,7 +54,12 @@ function open(item, event) {
   const rect = event.currentTarget.getBoundingClientRect();
   // A brief dwell avoids requesting image pages while the pointer crosses the catalog.
   timer = setTimeout(async () => {
-    preview.value = {item, rect, detail: null, src: '', status: 'loading'};
+    preview.value = {item, rect, detail: null, src: '', status: 'loading', revealed: !privacyMode.value};
+    if (privacyMode.value && event.type !== 'focus') {
+      revealTimer = setTimeout(() => {
+        if (current === version && preview.value) preview.value.revealed = true;
+      }, 500);
+    }
     const request = new AbortController();
     controller = request;
     try {
@@ -62,7 +71,7 @@ function open(item, event) {
         cache.set(item.url, detail);
       }
       if (current !== version) return;
-      preview.value = {item, rect, detail, src: displayImageUrl(detail.image), status: 'loading'};
+      preview.value = {...preview.value, detail, src: displayImageUrl(detail.image), status: 'loading'};
     } catch {
       if (current === version) preview.value.status = 'error';
     } finally {
@@ -85,6 +94,8 @@ function onKeydown(event) {
   if (event.key === 'Escape') close();
 }
 
+watch(privacyMode, close, {flush: 'sync'});
+
 onMounted(() => {
   window.addEventListener('scroll', close, true);
   window.addEventListener('resize', close);
@@ -103,7 +114,7 @@ defineExpose({open, close});
   <Teleport to="body">
     <aside v-if="preview" class="catalog-image-preview" :style="previewStyle" aria-label="单图预览">
       <div class="catalog-preview-image">
-        <img v-if="preview.src && preview.status !== 'error'" :key="preview.src" :src="preview.src" :alt="`第 ${preview.item.number} 张图片预览`" :class="{'is-ready': preview.status === 'ready'}" referrerpolicy="no-referrer" @load="imageLoaded($event.target.getAttribute('src'))" @error="imageFailed($event.target.getAttribute('src'))"/>
+        <img v-if="preview.src && preview.status !== 'error'" :key="preview.src" :src="preview.src" :alt="`第 ${preview.item.number} 张图片预览`" :class="{'is-ready': preview.status === 'ready'}" :data-privacy-revealed="preview.revealed || undefined" referrerpolicy="no-referrer" @load="imageLoaded($event.target.getAttribute('src'))" @error="imageFailed($event.target.getAttribute('src'))"/>
         <div v-if="preview.status === 'loading'" class="catalog-preview-state" role="status"><LoadingIndicator :variant="loadingStyle"/><span>正在加载预览…</span></div>
         <div v-else-if="preview.status === 'error'" class="catalog-preview-state" role="status"><strong>暂时无法预览</strong><span>点击缩略图查看单图</span></div>
       </div>

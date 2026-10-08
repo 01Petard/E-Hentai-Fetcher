@@ -341,6 +341,10 @@
 <script type="module">
     import {readLoadingStyle} from '/src/lib/loadingStyle.js';
     import {displayImageUrl, sourceHosts, sourceUrl} from '/src/lib/sourceSite.js';
+    import {readPrivacyMode} from '/src/lib/privacyMode.js';
+    import '/src/styles/privacyMode.css';
+
+    document.documentElement.classList.toggle('privacy-mode', readPrivacyMode());
 
     const urlInput = document.querySelector("#url");
     urlInput.value = sourceUrl(urlInput.value);
