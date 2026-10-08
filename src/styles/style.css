@@ -1602,7 +1602,7 @@ a {
     min-width: 0;
 }
 
-.quick-search-list button {
+.quick-search-list a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1620,22 +1620,21 @@ a {
     transition: border-color .2s, background-color .2s, color .2s;
 }
 
-.quick-search-list button:hover:not(:disabled) {
+.quick-search-list a:hover {
     border-color: #b66a51;
     background: #fff8f4;
     color: #a75c43;
 }
 
-.quick-search-list button[aria-pressed="true"] { border-color: #345d44; background: #345d44; color: #fff; }
-.quick-search-list button:disabled { opacity: .55; cursor: wait; }
-.quick-search-list button svg { flex: none; }
+.quick-search-list a[aria-current="page"] { border-color: #345d44; background: #345d44; color: #fff; }
+.quick-search-list a svg { flex: none; }
 .quick-search-edit { align-self: center; border: 0; background: none; color: #516d59; font-size: 11px; font-weight: 700; padding: 6px; white-space: nowrap; }
 .quick-search-edit:hover { color: #ad634a; }
 
 @media (max-width: 560px) {
     .quick-searches { display: block; }
     .quick-search-label { min-height: 25px; margin-bottom: 5px; }
-    .quick-search-list button { min-height: 29px; font-size: 10px; padding: 5px 9px; }
+    .quick-search-list a { min-height: 29px; font-size: 10px; padding: 5px 9px; }
 }
 
 /* Search and results share the first viewport. */
@@ -1648,7 +1647,7 @@ a {
 .search-form input { padding: 8px 0; font-size: 14px; }
 .search-form .primary-button { padding: 10px 16px; }
 .quick-searches { margin-top: 9px; }
-.quick-search-label, .quick-search-list button { min-height: 28px; }
+.quick-search-label, .quick-search-list a { min-height: 28px; }
 .search-foot { margin-top: 9px; }
 .results-section { margin-top: 18px; }
 .results-heading h2 { font-size: 21px; }

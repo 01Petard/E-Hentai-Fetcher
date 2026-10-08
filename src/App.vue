@@ -692,25 +692,6 @@ async function onCacheScopeChange(event) {
   if (!disposed) void runSearch(requestUrl.value || siteHomeUrl.value, pageIndex.value);
 }
 
-function goHome() {
-  try { sessionStorage.removeItem(searchSessionKey); } catch { /* The in-memory reset below still applies. */ }
-  searchText.value = '';
-  suggestionOpen.value = false;
-  tagPopover.value = null;
-  activeQuickLink.value = '';
-  resetFilters();
-  requestUrl.value = '';
-  pageIndex.value = 0;
-  pageSize.value = 0;
-  void runSearch(siteHomeUrl.value, 0);
-}
-
-function handleHomeClick(event) {
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  event.preventDefault();
-  goHome();
-}
-
 function isPageReload() {
   try {
     const type = performance.getEntriesByType?.('navigation')?.[0]?.type;
@@ -732,16 +713,6 @@ function submitSearch() {
     inputError.value = failure.message;
     searchInput.value?.focus();
   }
-}
-
-function openQuickLink(item) {
-  if (loading.value) return;
-  const target = sourceUrl(item.url, preferences.useEx);
-  if (!target) return;
-  activeQuickLink.value = item.label;
-  pageSize.value = 0;
-  const url = new URL(target);
-  runSearch(target, url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0);
 }
 
 function navigate(page) {
@@ -810,17 +781,15 @@ onMounted(async () => {
   preferencesReady = true;
   unsubscribeImmersiveCache = subscribeImmersiveCache(stats => { immersiveCacheStats.value = stats; });
   const currentUrl = new URL(window.location.href);
-  const linkedUploader = currentUrl.searchParams.get('url');
-  if (linkedUploader) {
-    try {
-      const url = new URL(linkedUploader);
-      if (url.protocol === 'https:' && sourceHosts.includes(url.hostname) && /^\/uploader\/[^/]+\/?$/i.test(url.pathname) &&
-          (!url.port || url.port === '443') && !url.username && !url.password && !url.hash) {
-        requestUrl.value = sourceUrl(url.href, preferences.useEx);
-        pageIndex.value = 0;
-      }
-    } catch { /* Ignore invalid uploader links. */
-    }
+  const linkedTarget = sourceUrl(currentUrl.searchParams.get('url'), preferences.useEx);
+  if (linkedTarget) {
+    requestUrl.value = linkedTarget;
+    searchText.value = '';
+    resetFilters();
+    activeQuickLink.value = currentUrl.searchParams.get('quickLink') || '';
+    const url = new URL(linkedTarget);
+    pageIndex.value = url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0;
+    pageSize.value = 0;
   }
   void configRequest.then(() => {
     if (!disposed) void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, pageIndex.value, {force: pageReload});
@@ -858,13 +827,13 @@ onUnmounted(() => {
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <a class="brand" :href="siteHomeUrl" aria-label="Gallery Lens，访问站点首页" @click="handleHomeClick">
+      <a class="brand" :href="`/?url=${encodeURIComponent(siteHomeUrl)}`" aria-label="Gallery Lens，访问站点首页" target="_blank" rel="noopener noreferrer">
         <span class="brand-mark">E<span>·</span></span>
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
-        <a :href="siteHomeUrl" @click="handleHomeClick"><UiIcon name="home" :size="15" /> 主页</a>
-        <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
+        <a :href="`/?url=${encodeURIComponent(siteHomeUrl)}`" target="_blank" rel="noopener noreferrer"><UiIcon name="home" :size="15" /> 主页</a>
+        <a href="/debug" target="_blank" rel="noopener noreferrer"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
     </header>
@@ -894,7 +863,7 @@ onUnmounted(() => {
         <nav class="quick-searches" aria-label="快速导航">
           <span class="quick-search-label"><UiIcon name="bookmark" :size="15" /> 快速导航</span>
           <div class="quick-search-list">
-            <button v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" type="button" :disabled="loading" :title="sourceUrl(item.url, preferences.useEx)" :aria-pressed="activeQuickLink === item.label" @click="openQuickLink(item)">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></button>
+            <a v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" :href="`/?url=${encodeURIComponent(sourceUrl(item.url, preferences.useEx))}&quickLink=${encodeURIComponent(item.label)}`" :title="sourceUrl(item.url, preferences.useEx)" :aria-current="activeQuickLink === item.label ? 'page' : undefined" target="_blank" rel="noopener noreferrer">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></a>
           </div>
           <button class="quick-search-edit" type="button" @click="openSettings('quick-links')">编辑</button>
           <span id="search-help" class="cookie-state"><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? 'Cookie 已配置' : 'Cookie 未配置' }}</span>
@@ -942,7 +911,7 @@ onUnmounted(() => {
           <span class="page-position-note">{{ pagePosition.label }} · 按结果总数估算</span>
         </div>
 
-        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>{{ result ? '新结果加载失败，仍显示上次结果' : '暂时无法展示结果' }}</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><button v-if="cookieConfigured" type="button" @click="runSearch(requestUrl, pageIndex, {force: true})">重试</button><a href="/debug"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
+        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>{{ result ? '新结果加载失败，仍显示上次结果' : '暂时无法展示结果' }}</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><button v-if="cookieConfigured" type="button" @click="runSearch(requestUrl, pageIndex, {force: true})">重试</button><a href="/debug" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
         <p v-if="loading && result" class="search-loading-note" role="status">正在加载新结果，当前显示上次结果…</p>
         <SearchSkeleton v-if="loading && !result" :view="view"/>
         <div v-else-if="!result && !error" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>从一次搜索开始</strong><p>输入关键词，按需调整高级筛选，结果会显示在这里。</p></div>
@@ -962,7 +931,7 @@ onUnmounted(() => {
                     种子
                   </button>
                   <span v-else class="no-torrent">暂无种子</span></div>
-                <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
+                <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3>
                   <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
                       v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
                                                                                                      @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else
@@ -974,11 +943,11 @@ onUnmounted(() => {
                 <div class="minimal-pages">{{ item.pages || '页数未知' }}</div>
               </template>
               <template v-else>
-                <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined">
+                <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined" target="_blank" rel="noopener noreferrer">
                 <img v-if="item.image" :src="displayImageUrl(item.image)" :alt="item.title" loading="lazy" decoding="async" />
                 <span v-else class="missing-image"><UiIcon name="image" :size="24" /> 无封面</span>
               </a>
-              <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
+              <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3>
               <div class="item-main"><span class="category">{{ item.category }}</span><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span></div>
                 <div class="item-details">
                   <time :datetime="item.published.replace(' ', 'T')" :title="item.published">
@@ -1010,7 +979,7 @@ onUnmounted(() => {
     <footer class="site-footer">
       <span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span>
       <nav class="footer-links" aria-label="页脚导航">
-        <a href="/development-log">
+        <a href="/development-log" target="_blank" rel="noopener noreferrer">
           <UiIcon name="book" :size="13" style="margin-right:4px"/> 开发日志
         </a>
         <span aria-hidden="true">·</span>
