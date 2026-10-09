@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="theme-color" content="#f5f5f1"/>
+  <meta name="theme-color" content="#f5f8f7"/>
   <script src="/theme-init.js"></script>
   <link rel="stylesheet" href="/src/styles/theme.css" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
@@ -77,8 +77,8 @@
           padding: 10px 18px;
           border: 0;
           border-radius: 7px;
-          color: white;
-          background: var(--action-bg, #2463eb);
+          color: var(--action-text);
+          background: var(--action-bg, #087f5b);
           font: inherit;
           font-weight: 650;
           cursor: pointer;
@@ -196,7 +196,7 @@
           .gallery-list.thumbnail .entry-cover img { max-height: 190px; }
       }
 
-      :root { color: var(--text-primary, #23382d); background: var(--page-bg, #f5f5f1); scrollbar-color: var(--scrollbar, #afc6b3) var(--page-bg, #f5f5f1); }
+      :root { color: var(--text-primary, #23382d); background: var(--page-bg, #f5f8f7); scrollbar-color: var(--scrollbar, #afc6b3) var(--page-bg, #f5f8f7); }
       ::selection { background: var(--surface-selected, #d5e9da); color: var(--text-primary, #243d2f); }
       main { border-color: var(--border, #e2e8df); border-radius: 16px; box-shadow: 0 12px 34px var(--shadow, #25402b0b); }
       h1 { font-size: 1.9rem; letter-spacing: -.03em; }
@@ -207,8 +207,8 @@
       input[type="checkbox"] { accent-color: var(--focus, #c77459); }
       input, textarea { border-color: var(--border, #d3dfd3); color: var(--text-primary, #23382d); caret-color: var(--text-warm, #c77459); }
       input:focus, textarea:focus { border-color: var(--border-strong, #92b19b); }
-      button { background: var(--warm-action-bg, #c77459); }
-      button:hover:not(:disabled) { background: var(--warm-action-hover, #aa5e45); }
+      button { background: var(--action-bg); }
+      button:hover:not(:disabled) { background: var(--action-hover); }
       .view-switch { background: var(--surface-soft, #edf2ec); }
       .view-switch button { color: var(--text-secondary, #536c5c); }
       .view-switch button:hover:not(:disabled) { background: var(--surface-hover, #e1ece2); }
@@ -295,7 +295,7 @@
 <div class="debug-shell">
   <header class="site-header source-navigation-header">
     <a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-    <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-7h6v7"/></svg> 主页</a><a id="source-user-settings" href="https://e-hentai.org/uconfig.php" target="_blank" rel="noopener noreferrer">个人设置</a><a id="source-home" href="https://e-hentai.org/" target="_blank" rel="noopener noreferrer">返回源站</a><a href="/debug" aria-current="page"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m5 0h5"/></svg> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
+    <nav class="header-actions debug-nav" aria-label="页面导航"><a href="/"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-7h6v7"/></svg> 主页</a><a id="source-user-settings" href="https://e-hentai.org/uconfig.php" target="_blank" rel="noopener noreferrer">个人设置</a><a id="source-home" href="https://e-hentai.org/" target="_blank" rel="noopener noreferrer">返回源站</a><a class="settings-trigger" href="/?settings=1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.8h4l.7 2.1 1.7.7 2-.9 2.8 2.8-.9 2 .7 1.7 2.1.8v4l-2.1.7-.7 1.7.9 2-2.8 2.8-2-.9-1.7.7-.7 2.1h-4l-.7-2.1-1.7-.7-2 .9-2.8-2.8.9-2-.7-1.7-2.1-.7v-4l2.1-.8.7-1.7-.9-2 2.8-2.8 2 .9 1.7-.7z" transform="translate(0 -1) scale(.92) translate(1 1)"/><circle cx="12" cy="12" r="2.8"/></svg> 配置 <span class="settings-dot"></span></a></nav>
   </header>
 <main class="debug-main">
   <section class="debug-request-card" aria-labelledby="debug-title">

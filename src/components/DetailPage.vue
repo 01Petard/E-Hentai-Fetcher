@@ -357,7 +357,7 @@ onUnmounted(() => {
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
     <header class="site-header source-navigation-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a :href="sourceUrl('/uconfig.php')" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15"/> 个人设置</a><a :href="sourceUrl('/')" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15"/> 返回源站</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
+      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a :href="sourceUrl('/uconfig.php')" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15"/> 个人设置</a><a :href="sourceUrl('/')" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15"/> 返回源站</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
       <div v-if="kind === 'image' && loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>
@@ -403,7 +403,7 @@ onUnmounted(() => {
               </div>
               <div v-for="item in data.metadata" :key="item.label">
                 <dt>{{ metadataLabels[item.label] || item.label }}</dt>
-                <dd><a v-if="item.url" :href="localGalleryUrl(item.url)">{{ metadataValue(item) }}</a><span v-else>{{ metadataValue(item) }}</span></dd>
+                <dd :class="{'detail-favorites': item.label === 'Favorited'}"><a v-if="item.url" :href="localGalleryUrl(item.url)">{{ metadataValue(item) }}</a><span v-else>{{ metadataValue(item) }}</span></dd>
               </div>
             </dl></div>
             <div v-if="data.tags.length" class="detail-tags-panel"><h2><UiIcon name="tag" :size="20"/>标签 <small>{{ tagCount }} 项</small></h2>

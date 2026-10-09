@@ -1,5 +1,5 @@
 .loading-indicator {
-    --loading-accent: var(--text-warm, #c77459);
+    --loading-accent: var(--warm-accent, #c64f37);
     --loading-base: var(--skeleton-bg, #d4e1d6);
     --loading-highlight: var(--surface-hover, #edf3ed);
     display: flex;
@@ -13,7 +13,7 @@
 .loading-indicator[hidden] { display: none }
 
 .loading-indicator--dark {
-    --loading-accent: #8db9ff;
+    --loading-accent: var(--reader-accent, #48d99b);
     --loading-base: #475469;
     --loading-highlight: #68768c
 }

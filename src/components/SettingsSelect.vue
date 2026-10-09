@@ -1,5 +1,5 @@
 <script setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue';
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
 import UiIcon from './UiIcon.vue';
 
 const props = defineProps({
@@ -13,6 +13,10 @@ const open = ref(false);
 const active = ref(0);
 const selected = computed(() => props.options.find(option => option.value === props.modelValue));
 let dialog;
+
+watch([open, active], () => {
+  if (open.value) element.value?.querySelector('.is-active')?.scrollIntoView({block: 'nearest'});
+}, {flush: 'post'});
 
 function close() { open.value = false; }
 

@@ -5,11 +5,11 @@ import {runInNewContext} from 'node:vm';
 import {createThemeController, normalizeTheme, readTheme, resolveTheme} from '../src/lib/theme.js';
 import {preferencesKey} from '../src/lib/configuration.js';
 
-function browser({theme, dark = false, blocked = false} = {}) {
+function browser({theme, palette, dark = false, blocked = false} = {}) {
   const events = new EventTarget();
   const media = new EventTarget();
   media.matches = dark;
-  const values = new Map(theme === undefined ? [] : [[preferencesKey, JSON.stringify({theme, useEx: true})]]);
+  const values = new Map(theme === undefined && palette === undefined ? [] : [[preferencesKey, JSON.stringify({theme, palette, useEx: true})]]);
   const meta = {content: '', setAttribute(name, value) { this[name] = value; }};
   const environment = {
     document: {documentElement: {dataset: {}, style: {}}, querySelector: () => meta},
@@ -28,6 +28,7 @@ function browser({theme, dark = false, blocked = false} = {}) {
       events.dispatchEvent(event);
     },
     get theme() { return environment.document.documentElement.dataset.theme; },
+    get palette() { return environment.document.documentElement.dataset.palette; },
   };
 }
 
@@ -43,13 +44,71 @@ test('theme preferences default safely for old, malformed and inaccessible stora
   assert.equal(resolveTheme('invalid', false), 'light');
 });
 
+test('palette selection persists through system appearance changes and synchronizes across tabs', () => {
+  const state = browser({palette: 'blue'});
+  const controller = createThemeController(state.environment);
+  assert.equal(state.palette, 'blue');
+  state.systemDark(true);
+  assert.equal(state.theme, 'dark');
+  assert.equal(state.palette, 'blue');
+  controller.setPalette('purple');
+  assert.equal(state.palette, 'purple');
+  const changes = [];
+  controller.subscribe((theme, palette) => changes.push([theme, palette]));
+  const saved = JSON.stringify({theme: 'light', palette: 'gray', useEx: true, translateTags: false});
+  state.values.set(preferencesKey, saved);
+  state.storageChange(preferencesKey);
+  assert.equal(state.theme, 'light');
+  assert.equal(state.palette, 'gray');
+  assert.equal(state.values.get(preferencesKey), saved);
+  assert.deepEqual(changes.at(-1), ['light', 'gray']);
+  state.values.delete(preferencesKey);
+  state.storageChange(null);
+  assert.equal(state.palette, 'emerald');
+  assert.equal(state.theme, 'dark');
+  controller.dispose();
+});
+
+test('invalid and inaccessible palette storage falls back while in-memory switching remains usable', () => {
+  for (const palette of [undefined, 'invalid', null, true, {}]) {
+    const state = browser({palette});
+    const controller = createThemeController(state.environment);
+    assert.equal(state.palette, 'emerald');
+    controller.dispose();
+  }
+  const state = browser({blocked: true});
+  const controller = createThemeController(state.environment);
+  controller.setPalette('rainbow');
+  assert.equal(state.palette, 'rainbow');
+  controller.setPalette('invalid');
+  assert.equal(state.palette, 'emerald');
+  controller.dispose();
+});
+
+test('the pre-paint bootstrap agrees with the runtime for every palette and appearance', () => {
+  const source = readFileSync(new URL('../public/theme-init.js', import.meta.url), 'utf8');
+  for (const palette of ['emerald', 'red', 'orange', 'amber', 'cyan', 'blue', 'purple', 'gray', 'rainbow', 'invalid']) {
+    for (const theme of ['system', 'light', 'dark']) {
+      for (const dark of [false, true]) {
+        const state = browser({theme, palette, dark});
+        runInNewContext(source, {...state.environment, window: state.environment});
+        const initial = {theme: state.theme, palette: state.palette, color: state.meta.content};
+        const controller = createThemeController(state.environment);
+        assert.deepEqual({theme: state.theme, palette: state.palette, color: state.meta.content}, initial);
+        assert.equal(state.palette, palette === 'invalid' ? 'emerald' : palette);
+        controller.dispose();
+      }
+    }
+  }
+});
+
 test('system theme updates live; manual choices take precedence until switched back', () => {
   const state = browser();
   const controller = createThemeController(state.environment);
   assert.equal(state.theme, 'light');
   state.systemDark(true);
   assert.equal(state.theme, 'dark');
-  assert.equal(state.meta.content, '#151b18');
+  assert.equal(state.meta.content, '#111a18');
   assert.equal(state.environment.document.documentElement.style.colorScheme, 'dark');
   controller.setPreference('light');
   state.systemDark(false);
@@ -60,7 +119,7 @@ test('system theme updates live; manual choices take precedence until switched b
   assert.equal(state.theme, 'dark');
   controller.setPreference('system');
   assert.equal(state.theme, 'light');
-  assert.equal(state.meta.content, '#f5f5f1');
+  assert.equal(state.meta.content, '#f5f8f7');
   controller.dispose();
 });
 
@@ -112,7 +171,7 @@ test('the synchronous bootstrap matches runtime resolution on every HTML entry',
       const state = browser({theme, dark});
       runInNewContext(source, {...state.environment, window: state.environment});
       assert.equal(state.theme, resolveTheme(theme, dark));
-      assert.equal(state.meta.content, state.theme === 'dark' ? '#151b18' : '#f5f5f1');
+      assert.equal(state.meta.content, state.theme === 'dark' ? '#111a18' : '#f5f8f7');
     }
   }
   const blocked = browser({blocked: true, dark: true});

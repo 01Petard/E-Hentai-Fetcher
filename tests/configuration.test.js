@@ -82,3 +82,43 @@ test('storage failure rolls back settings rather than leaving a partially restor
   assert.throws(() => writeConfiguration(store, config), /storage full/);
   assert.deepEqual(snapshot(store), original);
 });
+
+test('every palette round trips with light, dark and system appearance', () => {
+  for (const palette of ['emerald', 'red', 'orange', 'amber', 'cyan', 'blue', 'purple', 'gray', 'rainbow']) {
+    for (const theme of ['light', 'dark', 'system']) {
+      const source = storage();
+      initializeConfiguration(source);
+      source.setItem(preferencesKey, JSON.stringify({...defaultPreferences, palette, theme, useEx: true}));
+      const exported = JSON.parse(JSON.stringify(snapshot(source)));
+      assert.equal(exported.preferences.palette, palette);
+      const target = storage();
+      writeConfiguration(target, exported);
+      assert.deepEqual(snapshot(target), exported);
+    }
+  }
+});
+
+test('older configuration files restore emerald without resetting other preferences', () => {
+  const store = storage();
+  initializeConfiguration(store);
+  const old = snapshot(store);
+  delete old.preferences.palette;
+  old.preferences.theme = 'dark';
+  old.preferences.useEx = true;
+  const restored = writeConfiguration(store, old);
+  assert.equal(restored.preferences.palette, 'emerald');
+  assert.equal(restored.preferences.theme, 'dark');
+  assert.equal(restored.preferences.useEx, true);
+});
+
+test('invalid palettes reject the import without changing stored settings', () => {
+  const store = storage();
+  initializeConfiguration(store);
+  const original = snapshot(store);
+  for (const palette of ['unknown', null, true, {}]) {
+    const invalid = structuredClone(original);
+    invalid.preferences.palette = palette;
+    assert.throws(() => writeConfiguration(store, invalid));
+    assert.deepEqual(snapshot(store), original);
+  }
+});

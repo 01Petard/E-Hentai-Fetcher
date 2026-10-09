@@ -17,6 +17,7 @@ import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js'
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 import {privacyMode} from './lib/privacyMode.js';
 import {initializeTheme, themeOptions} from './lib/theme.js';
+import {paletteOptions} from './lib/palettes.js';
 import {defaultPreferences, defaultSearchDisplay, preferencesKey, searchDisplayKey, normalizeConfiguration, readConfiguration, writeConfiguration} from './lib/configuration.js';
 
 const searchText = ref('');
@@ -35,7 +36,7 @@ const settingsCategory = ref('connection');
 const settingsPanels = ref(null);
 const settingsSections = [
   { key: 'connection', label: '连接与账号', scope: '全站', icon: 'lock', description: '确认访问站点和 Cookie，开始浏览前先完成连接配置。' },
-  { key: 'search', label: '搜索与显示', scope: '首页搜索', icon: 'search', description: '管理标签显示、搜索联想和常用快捷导航。' },
+  { key: 'search', label: '搜索与展示', scope: '首页搜索', icon: 'search', description: '管理标签显示、搜索联想和常用快捷导航。' },
   { key: 'gallery', label: '画廊浏览', scope: '详情与阅读窗', icon: 'image', description: '设置悬浮预览、阅读操作、浏览进度和图片预载入。' },
   { key: 'general', label: '系统设置', scope: '所有页面', icon: 'settings', description: '调整界面主题、隐私保护和加载反馈。' },
   { key: 'maintenance', label: '数据维护', scope: '本机配置', icon: 'reset', description: '迁移使用偏好、管理标签数据库，或恢复默认配置。' },
@@ -57,6 +58,11 @@ const filters = reactive({...defaultSearchDisplay.filters});
 const view = ref(defaultSearchDisplay.view);
 const loading = ref(true);
 const result = ref(null);
+const failedHeroImages = ref([]);
+const heroImage = computed(() => result.value?.items
+  .map(item => displayImageUrl(item.image))
+  .find(image => image && !failedHeroImages.value.includes(image)) || '');
+watch(result, () => { failedHeroImages.value = []; }, {flush: 'sync'});
 const tagTranslations = shallowRef({});
 const tagDetails = shallowRef({});
 const tagSearchIndex = shallowRef([]);
@@ -67,15 +73,16 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const themeController = initializeTheme();
-const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value, theme: themeController.preference});
+const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value, theme: themeController.preference, palette: themeController.palette});
 let externalThemeSnapshot = null;
-const unsubscribeTheme = themeController.subscribe(theme => {
-  if (preferences.theme === theme) return;
+const unsubscribeTheme = themeController.subscribe((theme, palette) => {
+  if (preferences.theme === theme && preferences.palette === palette) return;
   // A theme received from another tab must not overwrite its other preferences.
-  externalThemeSnapshot = JSON.stringify({...preferences, theme});
-  preferences.theme = theme;
+  externalThemeSnapshot = JSON.stringify({...preferences, theme, palette});
+  Object.assign(preferences, {theme, palette});
 });
 watch(() => preferences.theme, value => themeController.setPreference(value), {flush: 'sync'});
+watch(() => preferences.palette, value => themeController.setPalette(value), {flush: 'sync'});
 watch(() => preferences.privacyMode, value => { privacyMode.value = value; }, {flush: 'sync'});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
@@ -1026,15 +1033,19 @@ onUnmounted(() => {
         <a :href="siteHomeUrl" @click="handleHomeClick"><UiIcon name="home" :size="15" /> 主页</a>
         <a :href="`${sourceOrigin(preferences.useEx)}/uconfig.php`" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15" /> 个人设置</a>
         <a :href="siteHomeUrl" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15" /> 返回源站</a>
-        <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
     </header>
 
     <main>
       <section class="search-hero" aria-labelledby="search-title">
-        <h1 id="search-title" class="hero-statement">E-Hentai Fetcher：一个E-Hentai第三方代理工具</h1>
-        <p class="hero-subtitle">快速检索、浏览与发现来自 E-Hentai 的内容</p>
+        <div class="hero-artwork" aria-hidden="true">
+          <img v-if="heroImage" :key="heroImage" :src="heroImage" alt="" decoding="async" @error="failedHeroImages.push($event.currentTarget.getAttribute('src'))" />
+        </div>
+        <div class="hero-heading">
+          <h1 id="search-title" class="hero-statement"><span class="hero-product">探索你感兴趣的图库</span></h1>
+          <p class="hero-subtitle">更便捷的 E-Hentai 搜索与浏览体验</p>
+        </div>
         <form class="search-form" @submit.prevent="submitSearch">
           <label class="sr-only" for="search-input">搜索内容</label>
           <UiIcon class="search-icon" name="search" :size="20" />
@@ -1170,7 +1181,7 @@ onUnmounted(() => {
     </Teleport>
 
     <footer class="site-footer">
-      <span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span>
+      <span>Gallery Lens <span class="footer-dot">·</span> E-Hentai 图库搜索与浏览</span>
       <nav class="footer-links" aria-label="页脚导航">
         <a href="/development-log">
           <UiIcon name="book" :size="13" style="margin-right:4px"/> 开发日志
@@ -1195,6 +1206,7 @@ onUnmounted(() => {
             <div ref="settingsPanels" class="settings-panels">
               <div class="settings-section-heading"><div><h3>{{ activeSettingsSection.label }}</h3><span class="settings-scope">{{ activeSettingsSection.scope }}</span></div><p>{{ activeSettingsSection.description }}</p></div>
               <section v-show="settingsCategory === 'connection'" class="settings-category" aria-label="连接与账号设置">
+                <div class="settings-debug-entry"><a class="settings-action-button" href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a></div>
                 <div class="settings-site-row"><div><h4>访问站点</h4><p>关闭时使用 E-Hentai，开启后使用 ExHentai。</p></div><label class="source-site-setting"><input v-model="preferences.useEx" type="checkbox"/> 启用 EX（ExHentai）</label></div>
                         <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
         <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
@@ -1210,6 +1222,11 @@ onUnmounted(() => {
                     <SettingsSelect v-if="settingsCategory === 'general'" id="theme" v-model="preferences.theme" :options="themeOptions" />
                   </div>
                   <p class="settings-detail-note">跟随系统时自动匹配设备外观；选择浅色或深色后固定使用该主题。</p>
+                  <div class="loading-style-setting">
+                    <label id="palette-label" for="palette">配色方案</label>
+                    <SettingsSelect v-if="settingsCategory === 'general'" id="palette" class="palette-select" v-model="preferences.palette" :options="paletteOptions" />
+                  </div>
+                  <p class="settings-detail-note">配色立即生效并自动保存，每套配色均支持浅色和深色，也会随配置一同导出。</p>
                 </div>
                 <div class="settings-preference-group"><h4>隐私保护</h4>            <div class="feature-switch-setting">
               <label><input v-model="preferences.privacyMode" type="checkbox" /> 隐私模式</label>
@@ -1222,7 +1239,7 @@ onUnmounted(() => {
           </div>
 </div>
               </section>
-              <section v-show="settingsCategory === 'search'" class="settings-category" aria-label="搜索与显示设置">
+              <section v-show="settingsCategory === 'search'" class="settings-category" aria-label="搜索与展示设置">
                 <div class="settings-preference-group">
                   <h4>标签与结果显示</h4>
                   <div class="feature-switches">
