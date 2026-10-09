@@ -1,6 +1,6 @@
 .detail-shell {
     min-height: 100vh;
-    background: #f5f5f1
+    background: var(--page-bg, #f5f5f1)
 }
 
 .detail-shell .brand {
@@ -17,13 +17,13 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    color: #66736f;
+    color: var(--text-secondary, #66736f);
     font-size: 13px;
     margin-bottom: 26px
 }
 
 .detail-breadcrumb a:hover {
-    color: #17655a
+    color: var(--text-accent, #17655a)
 }
 
 .detail-overview {
@@ -31,8 +31,8 @@
     grid-template-columns:230px minmax(0, 1fr);
     gap: 38px;
     padding: 30px;
-    background: white;
-    border: 1px solid #e0e7e1;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #e0e7e1);
     border-radius: 16px
 }
 
@@ -61,7 +61,7 @@
 }
 
 .detail-subtitle, .detail-uploader {
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     margin: 8px 0
 }
 
@@ -71,7 +71,7 @@
     gap: 20px 28px;
     margin: 30px 0 0;
     padding-top: 24px;
-    border-top: 1px solid #e5eae5
+    border-top: 1px solid var(--border, #e5eae5)
 }
 
 .detail-facts div {
@@ -79,7 +79,7 @@
 }
 
 .detail-facts dt {
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     font-size: 12px;
     margin-bottom: 6px
 }
@@ -103,13 +103,13 @@
 .detail-section h2 small {
     font-size: 13px;
     font-weight: 500;
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     margin-left: 7px
 }
 
 .detail-tag-groups {
-    background: white;
-    border: 1px solid #e0e7e1;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #e0e7e1);
     border-radius: 14px;
     padding: 8px 25px
 }
@@ -119,7 +119,7 @@
     grid-template-columns:110px 1fr;
     gap: 20px;
     padding: 14px 0;
-    border-bottom: 1px solid #edf0ed
+    border-bottom: 1px solid var(--border, #edf0ed)
 }
 
 .detail-tag-row:last-child {
@@ -128,7 +128,7 @@
 
 .detail-tag-row strong {
     font-size: 13px;
-    color: #66736f;
+    color: var(--text-secondary, #66736f);
     padding-top: 6px
 }
 
@@ -139,8 +139,8 @@
 }
 
 .detail-tag-row span {
-    background: #edf3ee;
-    color: #244b43;
+    background: var(--surface-soft, #edf3ee);
+    color: var(--text-accent, #244b43);
     padding: 5px 9px;
     border-radius: 6px;
     font-size: 13px
@@ -159,7 +159,7 @@
 }
 
 .detail-section-heading p {
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     font-size: 13px;
     margin: 0
 }
@@ -173,15 +173,15 @@
 .detail-pages a, .reader-controls a, .reader-controls button {
     padding: 8px 13px;
     text-decoration: none;
-    background: white;
-    border: 1px solid #dce5df;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #dce5df);
     border-radius: 7px;
-    color: #244b43;
+    color: var(--text-accent, #244b43);
     font-weight: 600
 }
 
 .detail-pages a[aria-current=page] {
-    background: #244b43;
+    background: var(--action-bg, #244b43);
     color: white
 }
 
@@ -194,8 +194,8 @@
 .detail-image-card {
     min-width: 0;
     align-self: start;
-    background: white;
-    border: 1px solid #e1e8e2;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #e1e8e2);
     border-radius: 10px;
     overflow: hidden;
     text-decoration: none;
@@ -203,7 +203,7 @@
 }
 
 .detail-image-card:hover {
-    border-color: #478572
+    border-color: var(--border-strong, #478572)
 }
 
 .detail-sprite-frame {
@@ -214,7 +214,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: #edf0ea
+    background: var(--surface-soft, #edf0ea)
 }
 
 .detail-sprite {
@@ -226,7 +226,7 @@
 
 .detail-image-number {
     display: block;
-    color: #57806e;
+    color: var(--text-secondary, #57806e);
     font-size: 12px;
     font-weight: 700;
     padding: 10px 11px 3px
@@ -239,7 +239,7 @@
     text-overflow: ellipsis;
     font-size: 12px;
     padding: 0 11px;
-    color: #52635c
+    color: var(--text-secondary, #52635c)
 }
 
 .reader-heading {
@@ -257,19 +257,19 @@
 
 .reader-heading p {
     margin: 0;
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     font-size: 13px
 }
 
 .reader-heading strong {
     white-space: nowrap;
     font-size: 23px;
-    color: #244b43
+    color: var(--text-accent, #244b43)
 }
 
 .reader-heading strong span {
     font-size: 15px;
-    color: #708078;
+    color: var(--text-secondary, #708078);
     font-weight: 500
 }
 
@@ -291,7 +291,7 @@
 
 .reader-image {
     text-align: center;
-    background: #e7ebe6;
+    background: var(--surface-soft, #e7ebe6);
     border-radius: 10px;
     min-height: 250px;
     overflow: hidden
@@ -312,23 +312,23 @@
     gap: 7px;
     padding: 9px 14px;
     border-radius: 8px;
-    background: #17655a;
+    background: var(--action-bg, #17655a);
     color: white;
     font-weight: 700;
     text-decoration: none
 }
 
 .reader-downloads a:hover {
-    background: #104d44
+    background: var(--action-hover, #104d44)
 }
 
 .reader-downloads a:focus-visible {
-    outline: 3px solid #64b6a5;
+    outline: 3px solid var(--focus, #64b6a5);
     outline-offset: 2px
 }
 
 .reader-downloads span {
-    color: #66736f;
+    color: var(--text-secondary, #66736f);
     font-size: 13px
 }
 
@@ -351,15 +351,15 @@
 }
 
 .detail-state p {
-    color: #65746e
+    color: var(--text-secondary, #65746e)
 }
 
 .detail-state a {
-    color: #17655a
+    color: var(--text-accent, #17655a)
 }
 
 .detail-shell a:focus-visible, .detail-shell button:focus-visible {
-    outline: 3px solid #62a88d;
+    outline: 3px solid var(--focus, #62a88d);
     outline-offset: 3px
 }
 
@@ -425,9 +425,9 @@
 }
 
 .detail-title-row { flex-wrap: wrap; }
-.gallery-download-entry { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: #17655a; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gallery-download-entry { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--text-accent, #17655a); font-size: 13px; font-weight: 700; cursor: pointer; }
 .gallery-download-entry:hover { text-decoration: underline; }
-.gallery-download-entry:focus-visible { outline: 2px solid #17655a; outline-offset: 3px; }
+.gallery-download-entry:focus-visible { outline: 2px solid var(--focus, #17655a); outline-offset: 3px; }
 
 .detail-overview {
     grid-template-columns:140px minmax(0, 1fr);
@@ -447,7 +447,7 @@
 }
 
 .detail-rating {
-    color: #9a6430;
+    color: var(--text-warm, #9a6430);
     font-weight: 700;
     font-size: 13px
 }
@@ -458,9 +458,9 @@
     gap: 8px 19px;
     margin: 17px 0 0;
     padding: 15px 0;
-    border-top: 1px solid #e5eae5;
-    border-bottom: 1px solid #e5eae5;
-    color: #66736f;
+    border-top: 1px solid var(--border, #e5eae5);
+    border-bottom: 1px solid var(--border, #e5eae5);
+    color: var(--text-secondary, #66736f);
     font-size: 13px
 }
 
@@ -469,7 +469,7 @@
 }
 
 .detail-facts strong {
-    color: #263d35;
+    color: var(--text-primary, #263d35);
     font-weight: 600;
     margin-left: 4px
 }
@@ -484,7 +484,7 @@
     gap: 7px;
     cursor: pointer;
     font-weight: 700;
-    color: #274e43;
+    color: var(--text-accent, #274e43);
     list-style: none
 }
 
@@ -495,7 +495,7 @@
 .detail-tags summary span {
     font-size: 12px;
     font-weight: 500;
-    color: #66736f
+    color: var(--text-secondary, #66736f)
 }
 
 .detail-tags .detail-tags-toggle {
@@ -522,10 +522,10 @@
 
 .detail-pages button {
     padding: 8px 12px;
-    border: 1px solid #dce5df;
+    border: 1px solid var(--border, #dce5df);
     border-radius: 7px;
-    background: white;
-    color: #244b43;
+    background: var(--surface, white);
+    color: var(--text-accent, #244b43);
     font-weight: 600;
     cursor: pointer
 }
@@ -537,20 +537,20 @@
 
 .detail-pages span {
     font-size: 13px;
-    color: #5e7167;
+    color: var(--text-secondary, #5e7167);
     white-space: nowrap
 }
 
 .detail-comment-list {
-    background: white;
-    border: 1px solid #e0e7e1;
+    background: var(--surface, white);
+    border: 1px solid var(--border, #e0e7e1);
     border-radius: 12px;
     padding: 0 22px
 }
 
 .detail-comment {
     padding: 18px 0;
-    border-bottom: 1px solid #e9eee9
+    border-bottom: 1px solid var(--border, #e9eee9)
 }
 
 .detail-comment:last-child {
@@ -565,11 +565,11 @@
 }
 
 .detail-comment-header strong {
-    color: #274e43
+    color: var(--text-accent, #274e43)
 }
 
 .detail-comment-header span {
-    color: #65746e;
+    color: var(--text-secondary, #65746e);
     font-size: 12px
 }
 
@@ -581,7 +581,7 @@
 }
 
 .detail-comment-empty {
-    color: #65746e
+    color: var(--text-secondary, #65746e)
 }
 
 @media (max-width: 700px) {
@@ -615,10 +615,10 @@
     right: 0;
     z-index: 10;
     padding: 10px;
-    border: 1px solid #dce5df;
+    border: 1px solid var(--border, #dce5df);
     border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 6px 18px #253b3020
+    background: var(--surface, #fff);
+    box-shadow: 0 6px 18px var(--shadow, #253b3020)
 }
 
 .detail-page-jump form {
@@ -629,9 +629,9 @@
 .detail-page-jump input {
     width: 62px;
     padding: 7px;
-    border: 1px solid #b8cabd;
+    border: 1px solid var(--border, #b8cabd);
     border-radius: 6px;
-    background: #fff;
+    background: var(--surface, #fff);
     text-align: center
 }
 
@@ -652,9 +652,9 @@
     max-width: 210px;
     padding: 7px 9px;
     border-radius: 6px;
-    background: #fff4f1;
-    color: #9b3527;
-    box-shadow: 0 4px 12px #253b3020;
+    background: var(--danger-bg, #fff4f1);
+    color: var(--text-danger, #9b3527);
+    box-shadow: 0 4px 12px var(--shadow, #253b3020);
     font-size: 12px
 }
 
@@ -718,12 +718,12 @@
 .detail-comments-title small {
     font-size: 13px;
     font-weight: 500;
-    color: #65746e
+    color: var(--text-secondary, #65746e)
 }
 
 .detail-comments-toggle {
     font-size: 13px;
-    color: #65746e
+    color: var(--text-secondary, #65746e)
 }
 
 .detail-comments[open] .detail-comment-list, .detail-comments[open] .detail-comment-empty {
@@ -731,7 +731,7 @@
 }
 
 .detail-tags summary:focus-visible, .detail-comments summary:focus-visible {
-    outline: 2px solid #62a88d;
+    outline: 2px solid var(--focus, #62a88d);
     outline-offset: 3px;
     border-radius: 3px
 }
@@ -756,12 +756,12 @@
     gap: 10px;
     min-height: 38px;
     padding: 4px 5px 4px 12px;
-    border: 1px solid #d8e3da;
+    border: 1px solid var(--border, #d8e3da);
     border-radius: 9px;
-    background: #f8faf7;
+    background: var(--surface-soft, #f8faf7);
     font-size: 12px;
     font-weight: 600;
-    color: #52665a;
+    color: var(--text-secondary, #52665a);
     white-space: nowrap
 }
 
@@ -769,22 +769,22 @@
     min-width: 60px;
     min-height: 28px;
     padding: 3px 23px 3px 9px;
-    border: 1px solid #d8e3da;
+    border: 1px solid var(--border, #d8e3da);
     border-radius: 6px;
-    background: #fff;
-    color: #17655a;
+    background: var(--surface, #fff);
+    color: var(--text-accent, #17655a);
     font: inherit;
     font-weight: 700;
     cursor: pointer
 }
 
 .detail-gallery-settings label:hover {
-    border-color: #a9c9b8;
-    background: #f1f7f2
+    border-color: var(--border, #a9c9b8);
+    background: var(--surface-hover, #f1f7f2)
 }
 
 .detail-gallery-settings select:hover {
-    border-color: #a9c9b8
+    border-color: var(--border, #a9c9b8)
 }
 
 .detail-image-grid {
@@ -792,7 +792,7 @@
 }
 
 .detail-gallery-settings select:focus-visible {
-    outline: 2px solid #62a88d;
+    outline: 2px solid var(--focus, #62a88d);
     outline-offset: 2px
 }
 
@@ -941,19 +941,19 @@
 .detail-pages button,
 .detail-page-jump button {
     padding: 6px 9px;
-    border: 1px solid #dce5df;
+    border: 1px solid var(--border, #dce5df);
     border-radius: 7px;
-    background: #fff;
-    color: #244b43;
+    background: var(--surface, #fff);
+    color: var(--text-accent, #244b43);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer
 }
 
 .detail-pages button[aria-current=page] {
-    border-color: #91b6a4;
-    background: #eaf5ee;
-    color: #17655a;
+    border-color: var(--border-strong, #91b6a4);
+    background: var(--surface-selected, #eaf5ee);
+    color: var(--text-accent, #17655a);
     font-weight: 800
 }
 
@@ -1134,7 +1134,7 @@
 .detail-overview-heading {
     padding-bottom: 12px;
     margin-bottom: 15px;
-    border-bottom: 1px solid #e5eae5;
+    border-bottom: 1px solid var(--border, #e5eae5);
     display: flow-root
 }
 
@@ -1145,10 +1145,10 @@
     gap: 8px;
     padding: 9px 13px;
     margin: 0 0 8px 16px;
-    border: 1px solid #17655a;
+    border: 1px solid var(--border-strong, #17655a);
     border-radius: 9px;
-    background: #eaf6f1;
-    color: #17655a;
+    background: var(--surface-selected, #eaf6f1);
+    color: var(--text-accent, #17655a);
     font: inherit;
     font-weight: 700;
     cursor: pointer
@@ -1160,11 +1160,11 @@
 }
 
 .immersive-entry:hover {
-    background: #d9eee5
+    background: var(--surface-hover, #d9eee5)
 }
 
 .immersive-entry:focus-visible {
-    outline: 3px solid #64b6a5;
+    outline: 3px solid var(--focus, #64b6a5);
     outline-offset: 2px
 }
 
@@ -1657,7 +1657,7 @@
     grid-template-columns:78px minmax(0, 1fr);
     gap: 5px;
     padding: 6px 0;
-    border-bottom: 1px solid #edf0ed;
+    border-bottom: 1px solid var(--border, #edf0ed);
     font-size: 12px;
     line-height: 1.4
 }
@@ -1667,18 +1667,18 @@
 }
 
 .detail-metadata dt {
-    color: #66736f
+    color: var(--text-secondary, #66736f)
 }
 
 .detail-metadata dd {
     margin: 0;
-    color: #263d35;
+    color: var(--text-primary, #263d35);
     font-weight: 600;
     overflow-wrap: anywhere
 }
 
 .detail-metadata a {
-    color: #17655a;
+    color: var(--text-accent, #17655a);
     text-decoration: none
 }
 
@@ -1698,7 +1698,7 @@
 .detail-tags-panel h2 small {
     font-size: 11px;
     font-weight: 500;
-    color: #66736f;
+    color: var(--text-secondary, #66736f);
     margin-left: 4px
 }
 
@@ -1757,11 +1757,11 @@
     z-index: 1100;
     padding: 12px;
     box-sizing: border-box;
-    border: 1px solid #c9dcd3;
+    border: 1px solid var(--border, #c9dcd3);
     border-radius: 12px;
-    background: #fff;
-    color: #23382d;
-    box-shadow: 0 12px 36px #172a1b30;
+    background: var(--surface, #fff);
+    color: var(--text-primary, #23382d);
+    box-shadow: 0 12px 36px var(--shadow, #172a1b30);
     pointer-events: none;
 }
 
@@ -1773,7 +1773,7 @@
     height: var(--preview-image-height);
     overflow: hidden;
     border-radius: 6px;
-    background: #f0f5f2;
+    background: var(--surface-soft, #f0f5f2);
 }
 
 .catalog-preview-sprite {
@@ -1784,7 +1784,7 @@
 
 .catalog-preview-image img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
 .catalog-preview-image img.is-ready { opacity: 1; }
-.catalog-preview-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; color: #50675b; font-size: 13px; text-align: center; }
+.catalog-preview-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; color: var(--text-secondary, #50675b); font-size: 13px; text-align: center; }
 
 .catalog-preview-caption {
     display: flex;
@@ -1795,11 +1795,11 @@
     line-height: 16px;
 }
 
-.catalog-preview-caption span { color: #50675b; }
+.catalog-preview-caption span { color: var(--text-secondary, #50675b); }
 
 /* Gallery overview and catalog. Keep reader styles separate. */
 .detail-shell.gallery-page {
-    background: #f4f8f6
+    background: var(--page-bg, #f4f8f6)
 }
 
 .gallery-page .detail-main {
@@ -1816,10 +1816,10 @@
 
 .detail-overview,
 .detail-catalog {
-    background: #fff;
-    border: 1px solid #dfe9e5;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #dfe9e5);
     border-radius: 16px;
-    box-shadow: 0 12px 32px #244b4310
+    box-shadow: 0 12px 32px var(--shadow, #244b4310)
 }
 
 .detail-overview {
@@ -1829,7 +1829,7 @@
 .detail-overview-heading {
     padding-bottom: 18px;
     margin-bottom: 20px;
-    border-color: #e5eeea
+    border-color: var(--border, #e5eeea)
 }
 
 .detail-source-link {
@@ -1837,7 +1837,7 @@
     align-items: center;
     gap: 5px;
     min-height: 34px;
-    color: #17655a;
+    color: var(--text-accent, #17655a);
     font-family: inherit;
     font-size: 13px;
     font-weight: 700;
@@ -1845,7 +1845,7 @@
 }
 
 .detail-source-link:hover { text-decoration: underline }
-.detail-source-link:focus-visible { outline: 2px solid #17655a; outline-offset: 3px }
+.detail-source-link:focus-visible { outline: 2px solid var(--focus, #17655a); outline-offset: 3px }
 
 .reader-overview-heading { display: flex; flex-direction: column; gap: 8px }
 .reader-overview-heading .detail-source-link { align-self: flex-end }
@@ -1856,7 +1856,7 @@
     margin: 8px 0 3px;
     font-size: clamp(14px, 1.65vw, 18px);
     line-height: 1.3;
-    color: #172a32
+    color: var(--text-primary, #172a32)
 }
 
 .immersive-entry-wrap {
@@ -1869,26 +1869,26 @@
 }
 
 .immersive-entry-wrap > span {
-    color: #829096;
+    color: var(--text-muted, #829096);
     font-size: 11px;
     white-space: nowrap
 }
 
 .detail-overview-heading .detail-subtitle {
-    color: #71818a;
+    color: var(--text-secondary, #71818a);
     font-size: 14px
 }
 
 .detail-title-row .category {
     padding: 5px 10px;
     border-radius: 8px;
-    background: #e3f0e9;
-    color: #17655a;
+    background: var(--surface-soft, #e3f0e9);
+    color: var(--text-accent, #17655a);
     font-size: 12px
 }
 
 .detail-rating {
-    color: #bd681e;
+    color: var(--text-warm, #bd681e);
     font-size: 15px
 }
 
@@ -1902,7 +1902,7 @@
     align-items: center;
     gap: 5px;
     min-height: 34px;
-    color: #849487;
+    color: var(--text-muted, #849487);
     font-size: 13px
 }
 
@@ -1916,14 +1916,14 @@
     margin: 0;
     border: 0;
     border-radius: 10px;
-    background: #187867;
+    background: var(--action-bg, #187867);
     color: #fff;
-    box-shadow: 0 6px 14px #17655a26;
+    box-shadow: 0 6px 14px var(--shadow, #17655a26);
     font-size: 15px
 }
 
 .immersive-entry:hover {
-    background: #116656
+    background: var(--action-hover, #116656)
 }
 
 .immersive-entry svg {
@@ -1939,16 +1939,16 @@
 
 .detail-cover {
     align-self: start;
-    border: 1px solid #e7eeeb;
+    border: 1px solid var(--border, #e7eeeb);
     border-radius: 10px;
-    box-shadow: 0 8px 20px #1d343215
+    box-shadow: 0 8px 20px var(--shadow, #1d343215)
 }
 
 .detail-metadata-panel,
 .detail-tags-panel {
     min-width: 0;
     padding-left: 28px;
-    border-left: 1px solid #e5eeea
+    border-left: 1px solid var(--border, #e5eeea)
 }
 
 .detail-metadata-panel h2,
@@ -1957,18 +1957,18 @@
     align-items: center;
     gap: 10px;
     margin: 0 0 16px;
-    color: #172a32;
+    color: var(--text-primary, #172a32);
     font-size: 18px
 }
 
 .detail-metadata-panel h2 svg,
 .detail-tags-panel h2 svg {
-    color: #187867
+    color: var(--text-accent, #187867)
 }
 
 .detail-tags-panel h2 small {
     margin-left: 2px;
-    color: #819096;
+    color: var(--text-muted, #819096);
     font-size: 12px
 }
 
@@ -1980,11 +1980,11 @@
 }
 
 .detail-metadata dt {
-    color: #73838c
+    color: var(--text-secondary, #73838c)
 }
 
 .detail-metadata dd {
-    color: #1c303a
+    color: var(--text-primary, #1c303a)
 }
 
 .detail-tags-panel .detail-tag-groups {
@@ -1992,12 +1992,12 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 0 8px 0 0;
-    scrollbar-color: #a8c9bb transparent;
+    scrollbar-color: var(--scrollbar, #a8c9bb) transparent;
     scrollbar-width: thin
 }
 
 .detail-tags-panel .detail-tag-groups:focus-visible {
-    outline: 2px solid #187867;
+    outline: 2px solid var(--focus, #187867);
     outline-offset: 2px;
     border-radius: 6px
 }
@@ -2011,7 +2011,7 @@
 
 .detail-tags-panel .detail-tag-row strong {
     padding-top: 6px;
-    color: #71818a;
+    color: var(--text-secondary, #71818a);
     font-size: 12px
 }
 
@@ -2022,8 +2022,8 @@
 .detail-tags-panel .detail-tag-row span {
     padding: 6px 11px;
     border-radius: 999px;
-    background: #eaf5f0;
-    color: #17655a;
+    background: var(--surface-selected, #eaf5f0);
+    color: var(--text-accent, #17655a);
     font-size: 12px;
     line-height: 1.3
 }
@@ -2079,17 +2079,17 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #172a32;
+    color: var(--text-primary, #172a32);
     font-size: 21px
 }
 
 .detail-catalog h2 svg {
-    color: #187867
+    color: var(--text-accent, #187867)
 }
 
 .detail-catalog h2 small {
     margin-left: 4px;
-    color: #829096;
+    color: var(--text-muted, #829096);
     font-size: 12px;
     font-weight: 500
 }
@@ -2100,15 +2100,15 @@
 
 .detail-catalog .detail-image-card {
     position: relative;
-    border-color: #e0e9e5;
+    border-color: var(--border, #e0e9e5);
     border-radius: 8px;
     padding: 5px 5px 7px
 }
 
 .detail-catalog .detail-image-card:hover,
 .detail-catalog .detail-image-card:focus-within {
-    border-color: #2b9b81;
-    box-shadow: 0 5px 14px #17655a1c
+    border-color: var(--border-strong, #2b9b81);
+    box-shadow: 0 5px 14px var(--shadow, #17655a1c)
 }
 
 .detail-image-link {
@@ -2118,7 +2118,7 @@
 }
 
 .detail-image-link:focus-visible {
-    outline: 2px solid #2b9b81;
+    outline: 2px solid var(--focus, #2b9b81);
     outline-offset: 2px
 }
 
@@ -2148,25 +2148,25 @@
     gap: 3px;
     min-height: 27px;
     padding: 3px 6px;
-    border: 1px solid #d4e7dd;
+    border: 1px solid var(--border, #d4e7dd);
     border-radius: 5px;
-    background: #fff;
-    box-shadow: 0 2px 8px #173f3440;
-    color: #17655a;
+    background: var(--surface, #fff);
+    box-shadow: 0 2px 8px var(--shadow, #173f3440);
+    color: var(--text-accent, #17655a);
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
     cursor: pointer
 }
 
-.detail-image-downloads button:hover { background: #eaf5ef }
-.detail-image-downloads button:focus-visible { outline: 2px solid #17655a; outline-offset: 2px }
+.detail-image-downloads button:hover { background: var(--surface-hover, #eaf5ef) }
+.detail-image-downloads button:focus-visible { outline: 2px solid var(--focus, #17655a); outline-offset: 2px }
 .detail-image-downloads button:disabled { opacity: .65; cursor: wait }
 
 .detail-image-download-error {
     display: block;
     padding: 4px 8px 0;
-    color: #b14038;
+    color: var(--text-danger, #b14038);
     font-size: 11px;
     overflow-wrap: anywhere
 }
@@ -2177,7 +2177,7 @@
 
 .detail-catalog .detail-sprite-frame {
     border-radius: 5px;
-    background: #f5f8f6
+    background: var(--surface-soft, #f5f8f6)
 }
 
 @media (max-width: 1050px) {
@@ -2229,7 +2229,7 @@
     .detail-tags-panel {
         padding: 14px 0 0;
         border-left: 0;
-        border-top: 1px solid #e5eeea
+        border-top: 1px solid var(--border, #e5eeea)
     }
 
     .detail-catalog {
@@ -2240,7 +2240,7 @@
 /* Reserve the existing overview and catalog layout while source pages arrive. */
 .detail-placeholder {
     display: block;
-    background: #e7eeea;
+    background: var(--skeleton-bg, #e7eeea);
     border-radius: 5px
 }
 
@@ -2268,23 +2268,23 @@
 .detail-tags-skeleton .detail-placeholder { width: 90px; height: 28px; border-radius: 14px }
 .detail-tags-skeleton .detail-placeholder:nth-child(3n) { width: 65px }
 .detail-placeholder-filename { height: 12px; margin: 4px 11px 30px }
-.detail-catalog .detail-image-placeholder:hover { border-color: #e1e8e2 }
+.detail-catalog .detail-image-placeholder:hover { border-color: var(--border, #e1e8e2) }
 
 .detail-catalog-error {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    color: #9b3527;
+    color: var(--text-danger, #9b3527);
     font-size: 13px
 }
 
 .detail-catalog-error button {
     padding: 6px 12px;
-    border: 1px solid #dce5df;
+    border: 1px solid var(--border, #dce5df);
     border-radius: 7px;
-    background: #fff;
-    color: #17655a;
+    background: var(--surface, #fff);
+    color: var(--text-danger, #17655a);
     font: inherit;
     cursor: pointer
 }

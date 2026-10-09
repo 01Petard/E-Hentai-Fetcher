@@ -16,6 +16,7 @@ import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 import {privacyMode} from './lib/privacyMode.js';
+import {initializeTheme, themeOptions} from './lib/theme.js';
 import {defaultPreferences, defaultSearchDisplay, preferencesKey, searchDisplayKey, normalizeConfiguration, readConfiguration, writeConfiguration} from './lib/configuration.js';
 
 const searchText = ref('');
@@ -36,7 +37,7 @@ const settingsSections = [
   { key: 'connection', label: '连接与账号', scope: '全站', icon: 'lock', description: '确认访问站点和 Cookie，开始浏览前先完成连接配置。' },
   { key: 'search', label: '搜索与显示', scope: '首页搜索', icon: 'search', description: '管理标签显示、搜索联想和常用快捷导航。' },
   { key: 'gallery', label: '画廊浏览', scope: '详情与阅读窗', icon: 'image', description: '设置悬浮预览、阅读操作、浏览进度和图片预载入。' },
-  { key: 'general', label: '系统设置', scope: '所有页面', icon: 'settings', description: '调整隐私保护和加载反馈。' },
+  { key: 'general', label: '系统设置', scope: '所有页面', icon: 'settings', description: '调整界面主题、隐私保护和加载反馈。' },
   { key: 'maintenance', label: '数据维护', scope: '本机配置', icon: 'reset', description: '迁移使用偏好、管理标签数据库，或恢复默认配置。' },
 ];
 const activeSettingsSection = computed(() => settingsSections.find(section => section.key === settingsCategory.value));
@@ -65,7 +66,16 @@ const loadedUrl = ref('');
 let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
-const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value});
+const themeController = initializeTheme();
+const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value, theme: themeController.preference});
+let externalThemeSnapshot = null;
+const unsubscribeTheme = themeController.subscribe(theme => {
+  if (preferences.theme === theme) return;
+  // A theme received from another tab must not overwrite its other preferences.
+  externalThemeSnapshot = JSON.stringify({...preferences, theme});
+  preferences.theme = theme;
+});
+watch(() => preferences.theme, value => themeController.setPreference(value), {flush: 'sync'});
 watch(() => preferences.privacyMode, value => { privacyMode.value = value; }, {flush: 'sync'});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
 let unsubscribeImmersiveCache;
@@ -354,7 +364,9 @@ function searchInputKeydown(event) {
 
 watch(preferences, value => {
   if (!preferencesReady) return;
-  try { localStorage.setItem(preferencesKey, JSON.stringify(value)); } catch { /* Settings still work for this session. */ }
+  const snapshot = JSON.stringify(value);
+  try { if (snapshot !== externalThemeSnapshot) localStorage.setItem(preferencesKey, snapshot); } catch { /* Settings still work for this session. */ }
+  externalThemeSnapshot = null;
   if (!value.tagDetails) tagPopover.value = null;
   if (!value.tagSuggestions) suggestionOpen.value = false;
   if (value.autoUpdate) updateTagData();
@@ -989,6 +1001,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unsubscribeTheme();
   closeResetConfirmation();
   disposed = true;
   ++searchVersion;
@@ -1191,6 +1204,13 @@ onUnmounted(() => {
 
               </section>
               <section v-show="settingsCategory === 'general'" class="settings-category" aria-label="系统设置">
+                <div class="settings-preference-group"><h4>界面主题</h4>
+                  <div class="loading-style-setting">
+                    <label id="theme-label" for="theme">主题</label>
+                    <SettingsSelect v-if="settingsCategory === 'general'" id="theme" v-model="preferences.theme" :options="themeOptions" />
+                  </div>
+                  <p class="settings-detail-note">跟随系统时自动匹配设备外观；选择浅色或深色后固定使用该主题。</p>
+                </div>
                 <div class="settings-preference-group"><h4>隐私保护</h4>            <div class="feature-switch-setting">
               <label><input v-model="preferences.privacyMode" type="checkbox" /> 隐私模式</label>
               <span class="setting-hint"><button type="button" aria-label="隐私模式说明" aria-describedby="privacy-mode-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="privacy-mode-hint" class="setting-hint-tooltip" role="tooltip">隐私模式下所有图片默认模糊，悬停 500ms 后显示清晰图片，移开后恢复模糊；悬浮预览额外等待 500ms。</span></span>

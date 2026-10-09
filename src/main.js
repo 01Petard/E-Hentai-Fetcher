@@ -1,3 +1,4 @@
+import {initializeTheme} from './lib/theme.js';
 import {createApp, watchEffect} from 'vue';
 import {privacyMode} from './lib/privacyMode.js';
 import App from './App.vue';
@@ -10,5 +11,7 @@ import './styles/privacyMode.css';
 try { initializeConfiguration(localStorage); } catch { /* Browsing remains available when local storage is unavailable. */ }
 
 watchEffect(() => document.documentElement.classList.toggle('privacy-mode', privacyMode.value));
+
+initializeTheme();
 
 createApp(['/gallery', '/image'].includes(window.location.pathname) ? DetailPage : App).mount('#app');

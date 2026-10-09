@@ -25,7 +25,7 @@ test('new installation creates complete defaults and fills older preferences wit
 test('complete configuration round trips across computers, excluding credentials, caches and progress', () => {
   const source = storage();
   initializeConfiguration(source);
-  source.setItem(preferencesKey, JSON.stringify({...defaultPreferences, immersiveImageSnap: true, immersiveSaveProgress: true, useLowFidelityPreview: true, cookie: 'excluded'}));
+  source.setItem(preferencesKey, JSON.stringify({...defaultPreferences, theme: 'dark', immersiveImageSnap: true, immersiveSaveProgress: true, useLowFidelityPreview: true, cookie: 'excluded'}));
   source.setItem('gallery-lens.gallery-page-size', '60');
   source.setItem('gallery-lens.gallery-columns', '4');
   source.setItem('gallery-lens.comments-collapsed', '1');
@@ -47,13 +47,24 @@ test('invalid files are rejected before any settings are written', () => {
   const store = storage();
   initializeConfiguration(store);
   const original = snapshot(store);
-  for (const mutate of [c => c.version = 99, c => c.gallery.pageSize = 21, c => c.gallery.columns = 0, c => c.preferences.privacyMode = 'true', c => c.preferences.loadingStyle = 'unknown', c => c.quickLinks = [{label: 'Bad', url: 'https://evil.example/'}], c => c.search.filters.f_sh = 'false']) {
+  for (const mutate of [c => c.version = 99, c => c.gallery.pageSize = 21, c => c.gallery.columns = 0, c => c.preferences.privacyMode = 'true', c => c.preferences.loadingStyle = 'unknown', c => c.preferences.theme = 'unknown', c => c.quickLinks = [{label: 'Bad', url: 'https://evil.example/'}], c => c.search.filters.f_sh = 'false']) {
     const config = structuredClone(original);
     mutate(config);
     assert.throws(() => writeConfiguration(store, config));
     assert.deepEqual(snapshot(store), original);
   }
   assert.throws(() => normalizeConfiguration(null));
+});
+
+test('configuration files exported before themes remain importable with the system default', () => {
+  const store = storage();
+  initializeConfiguration(store);
+  const old = snapshot(store);
+  delete old.preferences.theme;
+  old.preferences.useEx = true;
+  writeConfiguration(store, old);
+  assert.equal(snapshot(store).preferences.theme, 'system');
+  assert.equal(snapshot(store).preferences.useEx, true);
 });
 
 test('storage failure rolls back settings rather than leaving a partially restored configuration', () => {

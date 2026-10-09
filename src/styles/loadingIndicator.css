@@ -1,7 +1,7 @@
 .loading-indicator {
-    --loading-accent: #c77459;
-    --loading-base: #d4e1d6;
-    --loading-highlight: #edf3ed;
+    --loading-accent: var(--text-warm, #c77459);
+    --loading-base: var(--skeleton-bg, #d4e1d6);
+    --loading-highlight: var(--surface-hover, #edf3ed);
     display: flex;
     align-items: center;
     justify-content: center;

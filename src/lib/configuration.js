@@ -2,7 +2,7 @@ import {sourceHosts, sourceOrigin} from './sourceSite.js';
 
 export const preferencesKey = 'gallery-lens.preferences';
 export const searchDisplayKey = 'gallery-lens.search-display';
-export const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false, privacyMode: false, useLowFidelityPreview: false };
+export const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', theme: 'system', useEx: false, privacyMode: false, useLowFidelityPreview: false };
 export const defaultSearchDisplay = {view: 'thumbnail', filters: {advanced: false, f_sh: false, f_sto: false, f_spf: '', f_spt: '', f_srdd: '', f_sfl: false, f_sfu: false, f_sft: false}};
 const galleryKeys = {pageSize: 'gallery-lens.gallery-page-size', columns: 'gallery-lens.gallery-columns', commentsCollapsed: 'gallery-lens.comments-collapsed'};
 
@@ -18,9 +18,9 @@ export function normalizeConfiguration(input) {
   const invalid = () => { throw new Error('配置文件格式或选项无效，请选择本系统导出的配置文件。'); };
   if (input?.format !== 'gallery-lens.configuration' || input.version !== 1) invalid();
   const preferences = {};
-  const options = {updateHours: [6, 24, 168], immersivePreloadCount: [10, 20, 40, 60], immersivePreloadBeforeCount: [0, 5, 10, 20], loadingStyle: ['spinner', 'skeleton', 'progress', 'dots']};
+  const options = {updateHours: [6, 24, 168], immersivePreloadCount: [10, 20, 40, 60], immersivePreloadBeforeCount: [0, 5, 10, 20], loadingStyle: ['spinner', 'skeleton', 'progress', 'dots'], theme: ['system', 'light', 'dark']};
   for (const [key, fallback] of Object.entries(defaultPreferences)) {
-    const value = input.preferences?.[key];
+    const value = key === 'theme' && input.preferences?.theme === undefined ? fallback : input.preferences?.[key];
     if (options[key] ? !options[key].includes(value) : typeof value !== typeof fallback) invalid();
     preferences[key] = value;
   }
