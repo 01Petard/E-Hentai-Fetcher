@@ -356,14 +356,14 @@ onUnmounted(() => {
 
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
-    <header class="site-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页" target="_blank" rel="noopener noreferrer"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-      <nav class="header-actions" aria-label="页面导航"><a href="/" target="_blank" rel="noopener noreferrer"><UiIcon name="home" :size="15"/> 主页</a><a href="/debug" target="_blank" rel="noopener noreferrer"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
+    <header class="site-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
+      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
       <div v-if="kind === 'image' && loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>
         <h1>正在整理{{ kind === 'gallery' ? '画廊' : '图片' }}内容…</h1></div>
       <div v-else-if="error" class="detail-state" role="alert"><h1>无法显示详情</h1>
-        <p>{{ error }}</p><a href="/" target="_blank" rel="noopener noreferrer">返回搜索页</a></div>
+        <p>{{ error }}</p><a href="/">返回搜索页</a></div>
       <template v-else-if="kind === 'gallery'">
         <section class="detail-overview" :aria-busy="!data">
           <span v-if="!data" class="sr-only" role="status">正在加载画廊信息…</span>
@@ -399,11 +399,11 @@ onUnmounted(() => {
             <div :ref="observeMetadata" class="detail-metadata-panel"><h2><UiIcon name="info" :size="20"/>基本信息</h2><dl class="detail-metadata">
               <div v-if="data.uploader">
                 <dt>上传者</dt>
-                <dd><a v-if="data.uploaderUrl" :href="`/?url=${encodeURIComponent(data.uploaderUrl)}`" target="_blank" rel="noopener noreferrer">{{ data.uploader }}</a><span v-else>{{ data.uploader }}</span></dd>
+                <dd><a v-if="data.uploaderUrl" :href="`/?url=${encodeURIComponent(data.uploaderUrl)}`">{{ data.uploader }}</a><span v-else>{{ data.uploader }}</span></dd>
               </div>
               <div v-for="item in data.metadata" :key="item.label">
                 <dt>{{ metadataLabels[item.label] || item.label }}</dt>
-                <dd><a v-if="item.url" :href="localGalleryUrl(item.url)" target="_blank" rel="noopener noreferrer">{{ metadataValue(item) }}</a><span v-else>{{ metadataValue(item) }}</span></dd>
+                <dd><a v-if="item.url" :href="localGalleryUrl(item.url)">{{ metadataValue(item) }}</a><span v-else>{{ metadataValue(item) }}</span></dd>
               </div>
             </dl></div>
             <div v-if="data.tags.length" class="detail-tags-panel"><h2><UiIcon name="tag" :size="20"/>标签 <small>{{ tagCount }} 项</small></h2>
@@ -460,7 +460,7 @@ onUnmounted(() => {
           <div v-if="gallerySlots.length" class="detail-image-grid" :style="{ '--gallery-columns': columns }">
             <div v-for="item in gallerySlots" :key="item.number" class="detail-image-card" :class="{'detail-image-placeholder': !item.url}">
               <template v-if="item.url">
-              <a class="detail-image-link" :href="localImageUrl(item.url)" @pointerenter="catalogPreview.open(item, $event)" @pointerleave="catalogPreview.close()" @focus="catalogPreview.open(item, $event)" @blur="catalogPreview.close()" @click="catalogPreview.close()" target="_blank" rel="noopener noreferrer">
+              <a class="detail-image-link" :href="localImageUrl(item.url)" @pointerenter="catalogPreview.open(item, $event)" @pointerleave="catalogPreview.close()" @focus="catalogPreview.open(item, $event)" @blur="catalogPreview.close()" @click="catalogPreview.close()">
                 <div v-fit-sprite class="detail-sprite-frame">
                   <div class="detail-sprite" :style="{ width: item.width, height: item.height, backgroundImage: `url('${item.sprite}')`, backgroundPosition: item.position }"></div>
                 </div>
@@ -499,7 +499,7 @@ onUnmounted(() => {
           <p v-else class="detail-comment-empty">暂无评论。</p></details>
       </template>
       <template v-else-if="data">
-        <nav class="detail-breadcrumb" aria-label="当前位置"><a href="/" target="_blank" rel="noopener noreferrer">搜索结果</a><span>/</span><a v-if="data.gallery" :href="localGalleryUrl(data.gallery)" target="_blank" rel="noopener noreferrer">画廊详情</a><span>/</span><span>第 {{
+        <nav class="detail-breadcrumb" aria-label="当前位置"><a href="/">搜索结果</a><span>/</span><a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">画廊详情</a><span>/</span><span>第 {{
             data.number
           }} 页</span></nav>
         <div class="detail-overview-heading reader-overview-heading">
@@ -512,18 +512,18 @@ onUnmounted(() => {
         </div>
         <nav class="reader-controls" aria-label="图片导航">
           <button type="button" :disabled="!data.prev" @click="navigate(data.prev)">← 上一页</button>
-          <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)" target="_blank" rel="noopener noreferrer">返回图片目录</a>
+          <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">返回图片目录</a>
           <button type="button" :disabled="!data.next" @click="navigate(data.next)">下一页 →</button>
         </nav>
         <div class="reader-downloads" aria-label="下载图片">
-          <a :href="imageDownloadHref(data.image, 'preview')" target="_blank" rel="noopener noreferrer"><UiIcon name="download" :size="16"/>下载低保真图</a>
-          <a v-if="data.original" :href="imageDownloadHref(data.original, 'original')" target="_blank" rel="noopener noreferrer"><UiIcon name="download" :size="16"/>下载原图<template v-if="data.originalResolution || data.originalSize">（{{ [data.originalResolution, data.originalSize].filter(Boolean).join(' · ') }}）</template></a>
+          <a :href="imageDownloadHref(data.image, 'preview')"><UiIcon name="download" :size="16"/>下载低保真图</a>
+          <a v-if="data.original" :href="imageDownloadHref(data.original, 'original')"><UiIcon name="download" :size="16"/>下载原图<template v-if="data.originalResolution || data.originalSize">（{{ [data.originalResolution, data.originalSize].filter(Boolean).join(' · ') }}）</template></a>
           <span v-else>此页未提供原图下载地址</span>
         </div>
         <div class="reader-image"><img :src="data.image" :alt="`${data.title} 第 ${data.number} 页`" referrerpolicy="no-referrer"/></div>
         <nav class="reader-controls reader-controls-bottom" aria-label="底部图片导航">
           <button type="button" :disabled="!data.prev" @click="navigate(data.prev)">← 上一页</button>
-          <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)" target="_blank" rel="noopener noreferrer">返回图片目录</a>
+          <a v-if="data.gallery" :href="localGalleryUrl(data.gallery)">返回图片目录</a>
           <button type="button" :disabled="!data.next" @click="navigate(data.next)">下一页 →</button>
         </nav>
       </template>

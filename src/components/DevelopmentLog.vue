@@ -18,16 +18,16 @@ const groupedUpdates = computed(() => {
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <a class="brand log-brand" href="/" aria-label="Gallery Lens 首页" target="_blank" rel="noopener noreferrer">
+      <a class="brand log-brand" href="/" aria-label="Gallery Lens 首页">
         <span class="brand-mark">E<span>·</span></span>
         <span><strong>Gallery Lens</strong><small>在线图库检索</small></span>
       </a>
-      <nav class="header-actions" aria-label="页面导航"><a href="/" target="_blank" rel="noopener noreferrer">返回首页</a></nav>
+      <nav class="header-actions" aria-label="页面导航"><a href="/">返回首页</a></nav>
     </header>
 
     <main class="development-log">
       <div class="log-intro">
-        <div><a class="log-back" href="/" target="_blank" rel="noopener noreferrer"><UiIcon name="previous" :size="16" /> 返回首页</a><h1>开发日志</h1><p>查看功能更新、当前开发进度与后续计划</p></div>
+        <div><a class="log-back" href="/"><UiIcon name="previous" :size="16" /> 返回首页</a><h1>开发日志</h1><p>查看功能更新、当前开发进度与后续计划</p></div>
         <div class="log-stats" aria-label="功能概况"><span><strong>{{ updates.length }}</strong> 条更新</span><span><strong>{{ inDevelopment.length }}</strong> 开发中</span><span><strong>{{ roadmap.length }}</strong> 计划中</span></div>
       </div>
 
@@ -49,6 +49,6 @@ const groupedUpdates = computed(() => {
       </section>
     </main>
 
-    <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log" aria-current="page" target="_blank" rel="noopener noreferrer">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer"><UiIcon name="blog" :size="13" /> 作者主页</a></nav></footer>
+    <footer class="site-footer"><span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span><nav class="footer-links" aria-label="页脚导航"><a href="/development-log" aria-current="page">开发日志</a><span aria-hidden="true">·</span><a href="https://www.bugstack.top" target="_blank" rel="noopener noreferrer"><UiIcon name="blog" :size="13" /> 作者主页</a></nav></footer>
   </div>
 </template>

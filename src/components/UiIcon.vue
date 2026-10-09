@@ -27,6 +27,7 @@ defineProps({
     <template v-else-if="name === 'arrow-right'"><path d="M4 12h16m-6-6 6 6-6 6"/></template>
     <template v-else-if="name === 'reset'"><path d="M4 11a8 8 0 1 1 2 6M4 5v6h6"/></template>
     <template v-else-if="name === 'image'"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 16-5-5-8 10"/></template>
+    <template v-else-if="name === 'info-circle'"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".8" fill="currentColor" stroke="none"/></template>
     <template v-else-if="name === 'info'"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></template>
     <template v-else-if="name === 'tag'"><path d="M3 4h9l9 9-8 8-9-9V4Z"/><circle cx="8" cy="8" r="1.2"/><path d="m13 7 5 5"/></template>
     <template v-else-if="name === 'calendar'"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></template>

@@ -33,6 +33,7 @@ const previewStyle = computed(() => {
   return {
     width: `${panelWidth}px`,
     '--preview-image-height': `${Math.round(height * scale)}px`,
+    '--preview-image-scale': scale,
     left: `${Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin))}px`,
     top: `${Math.max(margin, Math.min(rect.top, window.innerHeight - panelHeight - margin))}px`,
   };
@@ -52,14 +53,19 @@ function open(item, event) {
   close();
   const current = version;
   const rect = event.currentTarget.getBoundingClientRect();
-  // A brief dwell avoids requesting image pages while the pointer crosses the catalog.
+  let useLowFidelity = false;
+  try {
+    useLowFidelity = JSON.parse(localStorage.getItem('gallery-lens.preferences'))?.useLowFidelityPreview === true;
+  } catch { /* Keep the fast thumbnail preview when storage is unavailable. */ }
+  preview.value = {item, rect, useLowFidelity, detail: null, src: '', status: 'loading', revealed: !privacyMode.value};
+  if (privacyMode.value && event.type !== 'focus') {
+    revealTimer = setTimeout(() => {
+      if (current === version && preview.value) preview.value.revealed = true;
+    }, 500);
+  }
+  // Thumbnail mode reuses the loaded sprite immediately; only the clearer mode requests a single-image page.
+  if (!useLowFidelity) return;
   timer = setTimeout(async () => {
-    preview.value = {item, rect, detail: null, src: '', status: 'loading', revealed: !privacyMode.value};
-    if (privacyMode.value && event.type !== 'focus') {
-      revealTimer = setTimeout(() => {
-        if (current === version && preview.value) preview.value.revealed = true;
-      }, 500);
-    }
     const request = new AbortController();
     controller = request;
     try {
@@ -71,7 +77,7 @@ function open(item, event) {
         cache.set(item.url, detail);
       }
       if (current !== version) return;
-      preview.value = {...preview.value, detail, src: displayImageUrl(detail.image), status: 'loading'};
+      preview.value = {...preview.value, detail, src: displayImageUrl(detail.image)};
     } catch {
       if (current === version) preview.value.status = 'error';
     } finally {
@@ -90,6 +96,10 @@ function imageFailed(src) {
   preview.value.status = 'error';
 }
 
+function onPreferencesChange(event) {
+  if (event.key === 'gallery-lens.preferences' || event.key === null) close();
+}
+
 function onKeydown(event) {
   if (event.key === 'Escape') close();
 }
@@ -100,12 +110,14 @@ onMounted(() => {
   window.addEventListener('scroll', close, true);
   window.addEventListener('resize', close);
   window.addEventListener('keydown', onKeydown);
+  window.addEventListener('storage', onPreferencesChange);
 });
 onUnmounted(() => {
   close();
   window.removeEventListener('scroll', close, true);
   window.removeEventListener('resize', close);
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('storage', onPreferencesChange);
 });
 defineExpose({open, close});
 </script>
@@ -114,11 +126,14 @@ defineExpose({open, close});
   <Teleport to="body">
     <aside v-if="preview" class="catalog-image-preview" :style="previewStyle" aria-label="单图预览">
       <div class="catalog-preview-image">
-        <img v-if="preview.src && preview.status !== 'error'" :key="preview.src" :src="preview.src" :alt="`第 ${preview.item.number} 张图片预览`" :class="{'is-ready': preview.status === 'ready'}" :data-privacy-revealed="preview.revealed || undefined" referrerpolicy="no-referrer" @load="imageLoaded($event.target.getAttribute('src'))" @error="imageFailed($event.target.getAttribute('src'))"/>
-        <div v-if="preview.status === 'loading'" class="catalog-preview-state" role="status"><LoadingIndicator :variant="loadingStyle"/><span>正在加载预览…</span></div>
-        <div v-else-if="preview.status === 'error'" class="catalog-preview-state" role="status"><strong>暂时无法预览</strong><span>点击缩略图查看单图</span></div>
+        <div v-if="!preview.useLowFidelity" class="catalog-preview-sprite detail-sprite" :style="{ width: preview.item.width, height: preview.item.height, backgroundImage: `url('${preview.item.sprite}')`, backgroundPosition: preview.item.position }" role="img" :aria-label="`第 ${preview.item.number} 张图片预览`" :data-privacy-revealed="preview.revealed || undefined"></div>
+        <template v-else>
+          <img v-if="preview.src && preview.status !== 'error'" :key="preview.src" :src="preview.src" :alt="`第 ${preview.item.number} 张图片预览`" :class="{'is-ready': preview.status === 'ready'}" :data-privacy-revealed="preview.revealed || undefined" referrerpolicy="no-referrer" @load="imageLoaded($event.target.getAttribute('src'))" @error="imageFailed($event.target.getAttribute('src'))"/>
+          <div v-if="preview.status === 'loading'" class="catalog-preview-state" role="status"><LoadingIndicator :variant="loadingStyle"/><span>正在加载预览…</span></div>
+          <div v-else-if="preview.status === 'error'" class="catalog-preview-state" role="status"><strong>暂时无法预览</strong><span>点击缩略图查看单图</span></div>
+        </template>
       </div>
-      <div class="catalog-preview-caption"><strong>第 {{ preview.item.number }} 张</strong><span>低保真预览</span></div>
+      <div class="catalog-preview-caption"><strong>第 {{ preview.item.number }} 张</strong><span>{{ preview.useLowFidelity ? '低保真预览' : '缩略图放大' }}</span></div>
     </aside>
   </Teleport>
 </template>

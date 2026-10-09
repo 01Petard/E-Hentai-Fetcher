@@ -1,6 +1,7 @@
 /* Cover images, readers, teleported previews and sprite-based catalog thumbnails. */
 .privacy-mode img, .privacy-mode .detail-sprite { filter: blur(16px); }
-.privacy-mode img[data-privacy-revealed] { filter: none; }
+.privacy-mode img[data-privacy-revealed],
+.privacy-mode .catalog-preview-sprite[data-privacy-revealed] { filter: none; }
 
 @keyframes privacy-reveal {
     to { filter: none; }

@@ -9,6 +9,7 @@ import {localGalleryUrl} from './lib/parseDetails.js';
 import {galleryCacheScopeKey, invalidateGalleryDetails} from './lib/galleryDetails.js';
 import {readTagCache, refreshTagTranslations} from './lib/tagTranslations.js';
 import UiIcon from './components/UiIcon.vue';
+import SettingsSelect from './components/SettingsSelect.vue';
 import TorrentDialog from './components/TorrentDialog.vue';
 import {clearImmersiveCache, getImmersiveCacheStats, subscribeImmersiveCache} from './lib/immersiveCache.js';
 import {clearImmersiveProgress} from './lib/immersiveProgress.js';
@@ -22,7 +23,17 @@ const quickLinkDrafts = ref([]);
 const quickLinkError = ref('');
 const quickLinkMessage = ref('');
 const quickLinkImportInput = ref(null);
-const settingsView = ref('settings');
+const quickLinksExpanded = ref(false);
+const settingsCategory = ref('connection');
+const settingsPanels = ref(null);
+const settingsSections = [
+  { key: 'connection', label: '连接与账号', scope: '全站', icon: 'lock', description: '确认访问站点和 Cookie，开始浏览前先完成连接配置。' },
+  { key: 'search', label: '搜索与显示', scope: '首页搜索', icon: 'search', description: '管理标签显示、搜索联想和常用快捷导航。' },
+  { key: 'gallery', label: '画廊浏览', scope: '详情与阅读窗', icon: 'image', description: '设置悬浮预览、阅读操作、浏览进度和图片预载入。' },
+  { key: 'general', label: '系统设置', scope: '所有页面', icon: 'settings', description: '调整隐私保护和加载反馈。' },
+  { key: 'maintenance', label: '数据维护', scope: '本机配置', icon: 'reset', description: '管理标签数据库，或恢复默认配置。' },
+];
+const activeSettingsSection = computed(() => settingsSections.find(section => section.key === settingsCategory.value));
 const draggingQuickLink = ref(null);
 let quickLinkDraftId = 0;
 let quickLinkDragPreview = null;
@@ -58,7 +69,7 @@ let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
 const preferencesKey = 'gallery-lens.preferences';
-const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false, privacyMode: false };
+const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false, privacyMode: false, useLowFidelityPreview: false };
 const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value});
 watch(() => preferences.privacyMode, value => { privacyMode.value = value; }, {flush: 'sync'});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
@@ -85,7 +96,13 @@ const configMessage = ref('');
 const savingCookie = ref(false);
 const clearingCookie = ref(false);
 const resettingSettings = ref(false);
+const resetConfirmation = ref(null);
+const resetCountdown = ref(3);
+const resetMessage = ref('');
+let resetDeadline = 0;
+let resetCountdownTimer;
 const settingsDialog = ref(null);
+const previewSourceOptions = [{value: false, label: '缩略图'}, {value: true, label: '低保真图'}];
 const resultsHeading = ref(null);
 const searchInput = ref(null);
 const torrentDialog = ref(null);
@@ -384,7 +401,8 @@ async function loadConfig() {
 }
 
 function openSettings(view = 'settings') {
-  settingsView.value = view === 'quick-links' ? 'quick-links' : 'settings';
+  settingsCategory.value = view === 'quick-links' ? 'search' : settingsSections[0].key;
+  quickLinksExpanded.value = view === 'quick-links';
   configError.value = '';
   configMessage.value = '';
   cookieDraft.value = '';
@@ -398,6 +416,15 @@ function openSettings(view = 'settings') {
     if ([0, 5, 10, 20].includes(Number(saved?.immersivePreloadBeforeCount))) preferences.immersivePreloadBeforeCount = Number(saved.immersivePreloadBeforeCount);
   } catch { /* Keep the current settings if storage is unavailable. */ }
   settingsDialog.value.showModal();
+}
+
+function closeSettingsOnBackdrop(event) {
+  if (event.target !== settingsDialog.value) return;
+  const rect = settingsDialog.value.getBoundingClientRect();
+  // Pointer capture can target the dialog after dragging; only close outside its bounds.
+  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+    settingsDialog.value.close();
+  }
 }
 
 function normalizeQuickLink(item) {
@@ -487,7 +514,7 @@ async function saveQuickLinks() {
       if (!response.ok) throw new Error((await response.json()).error || '保存快捷链接失败');
     } else localStorage.setItem(quickLinksStorageKey, JSON.stringify(links));
     quickLinks.value = links;
-    settingsView.value = 'settings';
+    quickLinkMessage.value = '快捷导航已保存。';
   } catch (failure) {
     quickLinkError.value = failure.message || '保存快捷链接失败';
   }
@@ -594,11 +621,40 @@ async function clearCookie() {
   }
 }
 
+function closeResetConfirmation() {
+  window.clearInterval(resetCountdownTimer);
+  resetCountdownTimer = undefined;
+  resetDeadline = 0;
+}
+
+function requestSettingsReset() {
+  if (resettingSettings.value || clearingCookie.value || savingCookie.value) return;
+  closeResetConfirmation();
+  resetMessage.value = '';
+  configError.value = '';
+  resetCountdown.value = 3;
+  resetDeadline = performance.now() + 3000;
+  resetConfirmation.value.showModal();
+  resetCountdownTimer = window.setInterval(() => {
+    resetCountdown.value = Math.max(0, Math.ceil((resetDeadline - performance.now()) / 1000));
+    if (!resetCountdown.value) window.clearInterval(resetCountdownTimer);
+  }, 100);
+}
+
+async function confirmSettingsReset() {
+  if (!resetConfirmation.value?.open || resetCountdown.value > 0 || performance.now() < resetDeadline
+      || resettingSettings.value || clearingCookie.value || savingCookie.value) return;
+  if (await resetSettings()) {
+    resetMessage.value = configMessage.value;
+    resetConfirmation.value.close();
+  }
+}
+
 async function resetSettings() {
   resettingSettings.value = true;
   if (!(await clearCookie())) {
     resettingSettings.value = false;
-    return;
+    return false;
   }
   if (serverQuickLinks) {
     try {
@@ -607,7 +663,7 @@ async function resetSettings() {
     } catch {
       configError.value = '清除快捷链接失败，请稍后重试';
       resettingSettings.value = false;
-      return;
+      return false;
     }
   }
   preferencesReady = false;
@@ -625,6 +681,7 @@ async function resetSettings() {
   preferencesReady = true;
   configMessage.value = '已恢复默认配置，并清除浏览器 Cookie 和已保存的浏览进度。';
   resettingSettings.value = false;
+  return true;
 }
 
 const searchLoader = browserSearchResultsLoader(async target => {
@@ -692,6 +749,25 @@ async function onCacheScopeChange(event) {
   if (!disposed) void runSearch(requestUrl.value || siteHomeUrl.value, pageIndex.value);
 }
 
+function goHome() {
+  try { sessionStorage.removeItem(searchSessionKey); } catch { /* The in-memory reset below still applies. */ }
+  searchText.value = '';
+  suggestionOpen.value = false;
+  tagPopover.value = null;
+  activeQuickLink.value = '';
+  resetFilters();
+  requestUrl.value = '';
+  pageIndex.value = 0;
+  pageSize.value = 0;
+  void runSearch(siteHomeUrl.value, 0);
+}
+
+function handleHomeClick(event) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  goHome();
+}
+
 function isPageReload() {
   try {
     const type = performance.getEntriesByType?.('navigation')?.[0]?.type;
@@ -713,6 +789,16 @@ function submitSearch() {
     inputError.value = failure.message;
     searchInput.value?.focus();
   }
+}
+
+function openQuickLink(item) {
+  if (loading.value) return;
+  const target = sourceUrl(item.url, preferences.useEx);
+  if (!target) return;
+  activeQuickLink.value = item.label;
+  pageSize.value = 0;
+  const url = new URL(target);
+  runSearch(target, url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0);
 }
 
 function navigate(page) {
@@ -769,7 +855,7 @@ onMounted(async () => {
   try {
     const saved = JSON.parse(localStorage.getItem(preferencesKey));
     if (saved && typeof saved === 'object') {
-      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap', 'useEx', 'privacyMode']) {
+      for (const key of ['translateTags', 'tagDetails', 'tagSuggestions', 'relativeTime', 'autoUpdate', 'immersivePreload', 'immersiveSaveProgress', 'immersiveImageSnap', 'useEx', 'privacyMode', 'useLowFidelityPreview']) {
         if (typeof saved[key] === 'boolean') preferences[key] = saved[key];
       }
       if ([6, 24, 168].includes(Number(saved.updateHours))) preferences.updateHours = Number(saved.updateHours);
@@ -781,15 +867,17 @@ onMounted(async () => {
   preferencesReady = true;
   unsubscribeImmersiveCache = subscribeImmersiveCache(stats => { immersiveCacheStats.value = stats; });
   const currentUrl = new URL(window.location.href);
-  const linkedTarget = sourceUrl(currentUrl.searchParams.get('url'), preferences.useEx);
-  if (linkedTarget) {
-    requestUrl.value = linkedTarget;
-    searchText.value = '';
-    resetFilters();
-    activeQuickLink.value = currentUrl.searchParams.get('quickLink') || '';
-    const url = new URL(linkedTarget);
-    pageIndex.value = url.searchParams.has('next') || url.searchParams.has('prev') ? null : 0;
-    pageSize.value = 0;
+  const linkedUploader = currentUrl.searchParams.get('url');
+  if (linkedUploader) {
+    try {
+      const url = new URL(linkedUploader);
+      if (url.protocol === 'https:' && sourceHosts.includes(url.hostname) && /^\/uploader\/[^/]+\/?$/i.test(url.pathname) &&
+          (!url.port || url.port === '443') && !url.username && !url.password && !url.hash) {
+        requestUrl.value = sourceUrl(url.href, preferences.useEx);
+        pageIndex.value = 0;
+      }
+    } catch { /* Ignore invalid uploader links. */
+    }
   }
   void configRequest.then(() => {
     if (!disposed) void runSearch(requestUrl.value || `${sourceOrigin(preferences.useEx)}/`, pageIndex.value, {force: pageReload});
@@ -812,6 +900,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  closeResetConfirmation();
   disposed = true;
   ++searchVersion;
   ++tagIndexVersion;
@@ -827,13 +916,13 @@ onUnmounted(() => {
 <template>
   <div class="app-shell">
     <header class="site-header">
-      <a class="brand" :href="`/?url=${encodeURIComponent(siteHomeUrl)}`" aria-label="Gallery Lens，访问站点首页" target="_blank" rel="noopener noreferrer">
+      <a class="brand" :href="siteHomeUrl" aria-label="Gallery Lens，访问站点首页" @click="handleHomeClick">
         <span class="brand-mark">E<span>·</span></span>
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
-        <a :href="`/?url=${encodeURIComponent(siteHomeUrl)}`" target="_blank" rel="noopener noreferrer"><UiIcon name="home" :size="15" /> 主页</a>
-        <a href="/debug" target="_blank" rel="noopener noreferrer"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
+        <a :href="siteHomeUrl" @click="handleHomeClick"><UiIcon name="home" :size="15" /> 主页</a>
+        <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
     </header>
@@ -863,7 +952,7 @@ onUnmounted(() => {
         <nav class="quick-searches" aria-label="快速导航">
           <span class="quick-search-label"><UiIcon name="bookmark" :size="15" /> 快速导航</span>
           <div class="quick-search-list">
-            <a v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" :href="`/?url=${encodeURIComponent(sourceUrl(item.url, preferences.useEx))}&quickLink=${encodeURIComponent(item.label)}`" :title="sourceUrl(item.url, preferences.useEx)" :aria-current="activeQuickLink === item.label ? 'page' : undefined" target="_blank" rel="noopener noreferrer">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></a>
+            <button v-for="(item, index) in quickLinks" :key="`${item.url}-${index}`" type="button" :disabled="loading" :title="sourceUrl(item.url, preferences.useEx)" :aria-pressed="activeQuickLink === item.label" @click="openQuickLink(item)">{{ item.label }}<UiIcon name="arrow-right" :size="12" /></button>
           </div>
           <button class="quick-search-edit" type="button" @click="openSettings('quick-links')">编辑</button>
           <span id="search-help" class="cookie-state"><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? 'Cookie 已配置' : 'Cookie 未配置' }}</span>
@@ -911,7 +1000,7 @@ onUnmounted(() => {
           <span class="page-position-note">{{ pagePosition.label }} · 按结果总数估算</span>
         </div>
 
-        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>{{ result ? '新结果加载失败，仍显示上次结果' : '暂时无法展示结果' }}</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><button v-if="cookieConfigured" type="button" @click="runSearch(requestUrl, pageIndex, {force: true})">重试</button><a href="/debug" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
+        <div v-if="error" class="message error-message" role="alert"><span class="message-icon error-icon"><UiIcon name="alert" :size="25" /></span><strong>{{ result ? '新结果加载失败，仍显示上次结果' : '暂时无法展示结果' }}</strong><p>{{ error }}</p><details v-if="rawResponse" class="response-source"><summary>查看原始 HTML 响应</summary><textarea readonly :value="rawResponse" aria-label="原始 HTML 响应"></textarea></details><div class="message-actions"><button v-if="!cookieConfigured" type="button" @click="openSettings"><UiIcon name="settings" :size="16" /> 打开配置</button><button v-if="cookieConfigured" type="button" @click="runSearch(requestUrl, pageIndex, {force: true})">重试</button><a href="/debug"><UiIcon name="external" :size="15" /> 前往调试页</a></div></div>
         <p v-if="loading && result" class="search-loading-note" role="status">正在加载新结果，当前显示上次结果…</p>
         <SearchSkeleton v-if="loading && !result" :view="view"/>
         <div v-else-if="!result && !error" class="message empty-state"><span class="message-icon"><UiIcon name="search" :size="29" /></span><strong>从一次搜索开始</strong><p>输入关键词，按需调整高级筛选，结果会显示在这里。</p></div>
@@ -931,7 +1020,7 @@ onUnmounted(() => {
                     种子
                   </button>
                   <span v-else class="no-torrent">暂无种子</span></div>
-                <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3>
+                <div class="minimal-content"><h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
                   <div v-if="item.tagGroups.length" class="minimal-tags"><span v-for="group in item.tagGroups" :key="group.label"><b>{{ group.label }}：</b><template
                       v-for="(tag, tagIndex) in group.values" :key="tag.key || tag.original"><button v-if="preferences.tagDetails && tag.key" type="button" class="tag-detail-trigger" :title="tag.key"
                                                                                                      @click="openTagDetails(tag, $event)">{{ tagText(tag) }}</button><span v-else
@@ -943,11 +1032,11 @@ onUnmounted(() => {
                 <div class="minimal-pages">{{ item.pages || '页数未知' }}</div>
               </template>
               <template v-else>
-                <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined" target="_blank" rel="noopener noreferrer">
+                <a class="item-image" :href="item.url ? localGalleryUrl(item.url) : undefined">
                 <img v-if="item.image" :src="displayImageUrl(item.image)" :alt="item.title" loading="lazy" decoding="async" />
                 <span v-else class="missing-image"><UiIcon name="image" :size="24" /> 无封面</span>
               </a>
-              <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></h3>
+              <h3 class="item-title"><a :href="item.url ? localGalleryUrl(item.url) : undefined" :title="item.title">{{ item.title }}</a></h3>
               <div class="item-main"><span class="category">{{ item.category }}</span><span v-if="item.ratingPosition" class="rating-stars" role="img" aria-label="站点星级" :style="{ backgroundImage: `url(https://ehgt.org/g/${item.ratingSprite})`, backgroundPosition: item.ratingPosition }"></span></div>
                 <div class="item-details">
                   <time :datetime="item.published.replace(' ', 'T')" :title="item.published">
@@ -979,7 +1068,7 @@ onUnmounted(() => {
     <footer class="site-footer">
       <span>E-HENTAI FETCHER <span class="footer-dot">·</span> INTEGRATION TOOL</span>
       <nav class="footer-links" aria-label="页脚导航">
-        <a href="/development-log" target="_blank" rel="noopener noreferrer">
+        <a href="/development-log">
           <UiIcon name="book" :size="13" style="margin-right:4px"/> 开发日志
         </a>
         <span aria-hidden="true">·</span>
@@ -991,25 +1080,142 @@ onUnmounted(() => {
 
     <TorrentDialog ref="torrentDialog"/>
 
-    <dialog ref="settingsDialog" class="settings-dialog" :class="{ 'quick-links-dialog': settingsView === 'quick-links' }" aria-labelledby="settings-title" @click="event => { if (event.target === settingsDialog) settingsDialog.close(); }" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag">
-      <div class="dialog-content"><div class="dialog-heading"><h2 id="settings-title">{{ settingsView === 'quick-links' ? '快捷导航' : '配置中心' }}</h2><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
-        <template v-if="settingsView === 'settings'">
-        <section class="feature-settings" aria-labelledby="feature-settings-title"><h3 id="feature-settings-title">浏览体验</h3>
-          <div class="feature-switches">
-            <label><input v-model="preferences.translateTags" type="checkbox" /> 标签汉化</label>
-            <label><input v-model="preferences.tagDetails" type="checkbox" /> 标签详情</label>
-            <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
-            <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
-            <label><input v-model="preferences.privacyMode" type="checkbox" /> 隐私模式</label>
+    <dialog ref="settingsDialog" class="settings-dialog" aria-labelledby="settings-title" @click="closeSettingsOnBackdrop" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag()">
+      <div class="dialog-content"><div class="dialog-heading"><div><h2 id="settings-title">配置中心</h2><p class="settings-heading-description">站点连接、页面偏好与数据维护</p></div><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
+          <div class="settings-layout">
+            <nav class="settings-navigation" aria-label="配置分类">
+              <button v-for="section in settingsSections" :key="section.key" type="button" :aria-pressed="settingsCategory === section.key" @click="stopQuickLinkDrag(); stopQuickLinkDrag(); settingsCategory = section.key; if (settingsPanels) settingsPanels.scrollTop = 0">
+                <UiIcon :name="section.icon" :size="18" /><span>{{ section.label }}</span><span v-if="section.key === 'connection'" class="settings-nav-status" :class="{ active: cookieConfigured }" :aria-label="cookieConfigured ? 'Cookie 已配置' : 'Cookie 未配置'"></span>
+              </button>
+            </nav>
+            <div ref="settingsPanels" class="settings-panels">
+              <div class="settings-section-heading"><div><h3>{{ activeSettingsSection.label }}</h3><span class="settings-scope">{{ activeSettingsSection.scope }}</span></div><p>{{ activeSettingsSection.description }}</p></div>
+              <section v-show="settingsCategory === 'connection'" class="settings-category" aria-label="连接与账号设置">
+                <div class="settings-site-row"><div><h4>访问站点</h4><p>关闭时使用 E-Hentai，开启后使用 ExHentai。</p></div><label class="source-site-setting"><input v-model="preferences.useEx" type="checkbox"/> 启用 EX（ExHentai）</label></div>
+                        <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
+        <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
+        <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><p v-else-if="configMessage" class="settings-message" role="status">{{ configMessage }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><div><button class="settings-action-button" type="button" :disabled="clearingCookie || savingCookie || !cookieConfigured" @click="clearCookie">{{ clearingCookie ? '清理中…' : '清理 Cookie' }}</button><button class="settings-action-button" type="submit" :disabled="savingCookie || clearingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}</button></div></div></form>
+
+        </section>
+
+              </section>
+              <section v-show="settingsCategory === 'general'" class="settings-category" aria-label="系统设置">
+                <div class="settings-preference-group"><h4>隐私保护</h4>            <div class="feature-switch-setting">
+              <label><input v-model="preferences.privacyMode" type="checkbox" /> 隐私模式</label>
+              <span class="setting-hint"><button type="button" aria-label="隐私模式说明" aria-describedby="privacy-mode-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="privacy-mode-hint" class="setting-hint-tooltip" role="tooltip">隐私模式下所有图片默认模糊，悬停 500ms 后显示清晰图片，移开后恢复模糊；悬浮预览额外等待 500ms。</span></span>
+            </div>
+</div>
+                <div class="settings-preference-group"><h4>加载反馈</h4>          <div class="loading-style-setting">
+            <label id="loading-style-label" for="loading-style">加载动画</label>
+            <SettingsSelect v-if="settingsCategory === 'general'" id="loading-style" v-model="preferences.loadingStyle" :options="loadingStyleOptions" />
           </div>
-          <p class="form-hint">隐私模式下所有图片默认模糊，悬停 500ms 后显示清晰图片，移开后恢复模糊；悬浮预览额外等待 500ms。</p>
-          <div class="loading-style-setting"><label for="loading-style">加载动画</label><select id="loading-style" v-model="preferences.loadingStyle"><option v-for="option in loadingStyleOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
-          <label class="source-site-setting"><input v-model="preferences.useEx" type="checkbox"/> 启用 EX（ExHentai）</label>
-          <h3>沉浸式浏览</h3>
-          <div class="immersive-cache-settings"><label><input v-model="preferences.immersiveSaveProgress" type="checkbox"/> 保存浏览进度</label><label><input v-model="preferences.immersiveImageSnap" type="checkbox"/> 图片吸附</label><label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label><label for="immersive-preload-count">向后预载入</label><select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select><label for="immersive-preload-before-count">向前预载入</label><select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select></div>
-          <div class="immersive-cache-status"><span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span><button class="settings-action-button" type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button></div>
-          <p class="immersive-cache-note">只缓存图片详情页预览图；关闭阅读窗时自动清空。</p>
-          <h3>标签数据库</h3>
+</div>
+              </section>
+              <section v-show="settingsCategory === 'search'" class="settings-category" aria-label="搜索与显示设置">
+                <div class="settings-preference-group">
+                  <h4>标签与结果显示</h4>
+                  <div class="feature-switches">
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.translateTags" type="checkbox" /> 标签汉化</label>
+                      <span class="setting-hint"><button type="button" aria-label="标签汉化说明" aria-describedby="translate-tags-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="translate-tags-hint" class="setting-hint-tooltip" role="tooltip">将有译名的标签显示为中文，暂无译名时保留原文。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.tagDetails" type="checkbox" /> 标签详情</label>
+                      <span class="setting-hint"><button type="button" aria-label="标签详情说明" aria-describedby="tag-details-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="tag-details-hint" class="setting-hint-tooltip" role="tooltip">点击标签可查看介绍和相关链接。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.tagSuggestions" type="checkbox" /> 搜索联想</label>
+                      <span class="setting-hint"><button type="button" aria-label="搜索联想说明" aria-describedby="tag-suggestions-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="tag-suggestions-hint" class="setting-hint-tooltip" role="tooltip">输入关键词时推荐匹配的标签，选择后填入搜索框。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.relativeTime" type="checkbox" /> 相对时间</label>
+                      <span class="setting-hint"><button type="button" aria-label="相对时间说明" aria-describedby="relative-time-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="relative-time-hint" class="setting-hint-tooltip" role="tooltip">将近期发布时间显示为“几分钟前”“几天前”等，较早的内容显示日期。</span></span>
+                    </div>
+                  </div>
+                </div>
+                <section class="quick-link-settings" aria-label="快捷导航设置">
+                  <button class="quick-link-toggle" type="button" aria-label="快捷导航管理" aria-controls="quick-link-manager" :aria-expanded="quickLinksExpanded" @click="stopQuickLinkDrag(); quickLinksExpanded = !quickLinksExpanded">
+                    <span><strong>快捷导航</strong><span>已保存 {{ quickLinks.length }} 项</span></span>
+                    <UiIcon name="chevron-down" :size="18" />
+                  </button>
+                  <form v-show="quickLinksExpanded" id="quick-link-manager" class="quick-link-manager" @submit.prevent="saveQuickLinks">
+                    <div class="quick-link-toolbar">
+                      <div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div>
+                    </div>
+                    <p class="quick-link-manager-note">填写路径和查询参数，完整链接会自动去掉域名。访问时跟随 EX 模式切换站点。</p>
+                    <div class="quick-link-scroll">
+                      <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
+                        <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
+                          <div class="quick-link-row">
+                            <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置，上下方向键排序`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
+                            <input v-model="item.label" class="quick-link-name" type="text" :aria-label="`第 ${index + 1} 项名称`" :title="item.label" placeholder="名称" />
+                            <div class="quick-link-url"><span class="quick-link-base">{{ sourceOrigin(preferences.useEx) }}</span><input v-model="item.url" class="quick-link-address" type="text" :aria-label="`第 ${index + 1} 项地址`" :title="item.url" placeholder="/?f_search=AHY" /></div>
+                            <button class="quick-link-delete" type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
+                          </div>
+
+                        </div>
+                      </TransitionGroup>
+                      <p v-if="!quickLinkDrafts.length" class="quick-link-empty">暂无快捷导航，添加链接或导入 JSON 开始配置。</p>
+                    </div>
+                    <div class="quick-link-manager-footer">
+                      <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p>
+                      <div><span>{{ quickLinkDrafts.length }} 项 · 修改后需保存生效</span><button class="settings-action-button" type="submit">保存快捷链接</button></div>
+                    </div>
+                    <input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" />
+                  </form>
+                </section>
+
+              </section>
+              <section v-show="settingsCategory === 'gallery'" class="settings-category" aria-label="画廊浏览设置">
+                <div class="settings-preference-group">
+                  <h4>悬浮预览</h4>
+                  <div class="loading-style-setting">
+                    <div class="feature-switch-setting preview-source-setting">
+                      <label id="preview-source-label" for="preview-source">预览图来源</label>
+                      <span class="setting-hint"><button type="button" aria-label="预览图来源说明" aria-describedby="preview-source-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="preview-source-hint" class="setting-hint-tooltip" role="tooltip">使用缩略图加载较快，使用低保真图清晰度较高</span></span>
+                    </div>
+                    <SettingsSelect v-if="settingsCategory === 'gallery'" id="preview-source" v-model="preferences.useLowFidelityPreview" :options="previewSourceOptions" />
+                  </div>
+                  <p class="settings-detail-note">缩略图直接放大页面上已加载的图片；低保真图需从单图页面加载。</p>
+                </div>
+                <div class="settings-preference-group">
+                  <h4>阅读与预载入</h4>
+                  <div class="immersive-cache-settings">
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.immersiveSaveProgress" type="checkbox"/> 保存浏览进度</label>
+                      <span class="setting-hint"><button type="button" aria-label="保存浏览进度说明" aria-describedby="immersive-progress-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-progress-hint" class="setting-hint-tooltip" role="tooltip">将画廊阅读位置保存在本浏览器，下次打开阅读窗时继续阅读。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.immersiveImageSnap" type="checkbox"/> 图片吸附</label>
+                      <span class="setting-hint"><button type="button" aria-label="图片吸附说明" aria-describedby="immersive-snap-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-snap-hint" class="setting-hint-tooltip" role="tooltip">双页阅读时让两张图片贴合，消除中间的间隙。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label><input v-model="preferences.immersivePreload" type="checkbox"/> 启用预载入</label>
+                      <span class="setting-hint"><button type="button" aria-label="启用预载入说明" aria-describedby="immersive-preload-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-preload-hint" class="setting-hint-tooltip" role="tooltip">提前加载阅读位置前后的预览图，减少翻页等待；会增加网络和内存占用。</span></span>
+                    </div>
+                    <div class="feature-switch-setting">
+                      <label for="immersive-preload-count">向后预载入</label>
+                      <span class="setting-hint"><button type="button" aria-label="向后预载入说明" aria-describedby="immersive-preload-after-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-preload-after-hint" class="setting-hint-tooltip" role="tooltip">设置提前加载后续图片的张数，启用预载入后生效。</span></span>
+                    </div>
+                    <select id="immersive-preload-count" v-model.number="preferences.immersivePreloadCount" :disabled="!preferences.immersivePreload"><option v-for="count in [10, 20, 40, 60]" :key="count" :value="count">{{ count }} 张</option></select>
+                    <div class="feature-switch-setting">
+                      <label for="immersive-preload-before-count">向前预载入</label>
+                      <span class="setting-hint"><button type="button" aria-label="向前预载入说明" aria-describedby="immersive-preload-before-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-preload-before-hint" class="setting-hint-tooltip" role="tooltip">设置提前加载前面图片的张数，方便回看；选择“关闭”则不向前预载入。</span></span>
+                    </div>
+                    <select id="immersive-preload-before-count" v-model.number="preferences.immersivePreloadBeforeCount" :disabled="!preferences.immersivePreload"><option v-for="count in [0, 5, 10, 20]" :key="count" :value="count">{{ count ? `${count} 张` : '关闭' }}</option></select>
+                  </div>
+                  <div class="immersive-cache-status">
+                    <span>当前页面缓存 {{ immersiveCacheStats.ready }} 张<span v-if="immersiveCacheStats.loading"> · 加载中 {{ immersiveCacheStats.loading }} 张</span></span>
+                    <div class="feature-switch-setting">
+                      <button class="settings-action-button" type="button" :disabled="!immersiveCacheStats.ready && !immersiveCacheStats.loading" @click="clearImmersiveCache()">清理缓存</button>
+                      <span class="setting-hint"><button type="button" aria-label="清理缓存说明" aria-describedby="immersive-cache-hint" @click="$event.currentTarget.focus()" @keydown.esc.stop.prevent="$event.currentTarget.blur()"><UiIcon name="info-circle" :size="15" /></button><span id="immersive-cache-hint" class="setting-hint-tooltip" role="tooltip">释放已预载入的图片缓存并停止正在进行的图片预载入，保留已保存的阅读进度。</span></span>
+                    </div>
+                  </div>
+                  <p class="settings-detail-note">只缓存图片详情页预览图；关闭阅读窗时自动清空。</p>
+                </div>
+              </section>
+              <section v-show="settingsCategory === 'maintenance'" class="settings-category" aria-label="数据维护设置">
+                <div class="settings-preference-group settings-tag-maintenance">          <h4>标签数据库</h4>
           <p>本机缓存标签译名与介绍；自动更新在页面打开期间按设置的间隔检查。</p>
           <div class="tag-update-controls"><label><input v-model="preferences.autoUpdate" type="checkbox" /> 自动更新</label><label for="tag-update-interval">检查间隔</label><select id="tag-update-interval" v-model.number="preferences.updateHours" :disabled="!preferences.autoUpdate"><option :value="6">6 小时</option><option :value="24">24 小时</option><option :value="168">7 天</option></select></div>
           <div class="tag-update-status">
@@ -1019,43 +1225,22 @@ onUnmounted(() => {
             <button class="settings-action-button" :disabled="tagUpdate.busy" type="button" @click="updateTagData(true)">{{ tagUpdate.busy ? '检查中…' : '检查更新' }}</button>
           </div>
           <p v-if="tagUpdate.error" class="form-error" role="alert">{{ tagUpdate.error }}{{ tagUpdate.sha ? '；已缓存的标签仍可使用。' : '；请稍后重试。' }}</p><p v-else-if="tagUpdate.message" class="tag-update-message" role="status">{{ tagUpdate.message }}</p>
-        </section>
-        <section class="quick-link-settings quick-link-entry" aria-label="快捷导航设置">
-          <div><h3>快捷导航</h3><p>已保存 {{ quickLinks.length }} 项</p></div>
-          <button class="settings-action-button" type="button" @click="settingsView = 'quick-links'">管理 <UiIcon name="arrow-right" :size="14" /></button>
-        </section>
-        <section class="cookie-settings" aria-labelledby="cookie-settings-title"><h3 id="cookie-settings-title">Cookie</h3>
-        <p>Cookie 保存在当前浏览器中，仅供此浏览器的请求使用。未配置时，本地服务可从 <code>.env.local</code> 读取备用值。页面不会显示已保存的值。</p>
-        <form @submit.prevent="saveCookie"><label for="cookie-value">Cookie 请求头的值</label><textarea id="cookie-value" v-model="cookieDraft" spellcheck="false" autocomplete="off" placeholder="cf_clearance=...; ipb_member_id=...; ipb_pass_hash=..."></textarea><p class="form-hint"><UiIcon name="lock" :size="14" /> 保存后不会在输入框中回显；再次填写会覆盖旧值。</p><p v-if="configError" class="form-error" role="alert">{{ configError }}</p><p v-else-if="configMessage" class="settings-message" role="status">{{ configMessage }}</p><div class="dialog-actions"><span><span class="status-light" :class="{ active: cookieConfigured }"></span>{{ cookieConfigured ? '已配置' : '尚未配置' }}</span><div><button class="settings-action-button" type="button" :disabled="clearingCookie || savingCookie || !cookieConfigured" @click="clearCookie">{{ clearingCookie ? '清理中…' : '清理 Cookie' }}</button><button class="settings-action-button" type="submit" :disabled="savingCookie || clearingCookie">{{ savingCookie ? '保存中…' : '保存 Cookie' }}</button></div></div></form>
-        <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie" @click="resetSettings">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div>
-        </section>
-        </template>
-        <form v-else class="quick-link-manager" @submit.prevent="saveQuickLinks">
-          <div class="quick-link-toolbar">
-            <button class="settings-action-button" type="button" @click="settingsView = 'settings'; stopQuickLinkDrag()">返回配置</button>
-            <div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div>
+</div>
+                <div class="settings-preference-group settings-danger-zone"><h4>恢复默认配置</h4>        <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie" @click="requestSettingsReset">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div><p v-if="resetMessage" class="settings-message" role="status">{{ resetMessage }}</p></div>
+              </section>
+            </div>
           </div>
-          <p class="quick-link-manager-note">填写路径和查询参数，完整链接会自动去掉域名。访问时跟随 EX 模式切换站点。</p>
-          <div class="quick-link-scroll">
-            <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
-              <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
-                <div class="quick-link-row">
-                  <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置，上下方向键排序`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
-                  <input v-model="item.label" class="quick-link-name" type="text" :aria-label="`第 ${index + 1} 项名称`" :title="item.label" placeholder="名称" />
-                  <div class="quick-link-url"><span class="quick-link-base">{{ sourceOrigin(preferences.useEx) }}</span><input v-model="item.url" class="quick-link-address" type="text" :aria-label="`第 ${index + 1} 项地址`" :title="item.url" placeholder="/?f_search=AHY" /></div>
-                  <button class="quick-link-delete" type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
-                </div>
+          <div class="settings-save-note"><UiIcon name="check" :size="15" /><span>偏好设置自动保存，Cookie 与快捷导航需单独保存。</span></div>
 
-              </div>
-            </TransitionGroup>
-            <p v-if="!quickLinkDrafts.length" class="quick-link-empty">暂无快捷导航，添加链接或导入 JSON 开始配置。</p>
-          </div>
-          <div class="quick-link-manager-footer">
-            <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p>
-            <div><span>{{ quickLinkDrafts.length }} 项 · 修改后需保存生效</span><button class="settings-action-button" type="submit">保存快捷链接</button></div>
-          </div>
-          <input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" />
-        </form>
+      </div>
+    </dialog>
+    <dialog ref="resetConfirmation" class="reset-confirmation-dialog" aria-labelledby="reset-confirmation-title" aria-describedby="reset-confirmation-description" @cancel="event => { if (resettingSettings) event.preventDefault(); }" @close="closeResetConfirmation">
+      <h2 id="reset-confirmation-title">恢复默认配置？</h2>
+      <p id="reset-confirmation-description">将恢复所有偏好设置，并清除浏览器 Cookie、快捷导航及已保存的画廊阅读进度。</p>
+      <p v-if="configError" class="form-error" role="alert">{{ configError }}</p>
+      <div class="reset-confirmation-actions">
+        <button class="settings-action-button" type="button" autofocus :disabled="resettingSettings" @click="resetConfirmation.close()">取消</button>
+        <button class="settings-action-button reset-confirmation-confirm" type="button" :disabled="resetCountdown > 0 || resettingSettings || clearingCookie || savingCookie" @click="confirmSettingsReset">{{ resettingSettings ? '恢复中…' : resetCountdown > 0 ? `确定（${resetCountdown} 秒）` : '确定' }}</button>
       </div>
     </dialog>
   </div>
