@@ -4,7 +4,7 @@
 
 在线使用：https://e-fetcher.bugstack.top
 
-**Gallery Lens** 通过代理访问并解析 E-Hentai / ExHentai 内容，在保留源站搜索与图库能力的基础上，提供标签增强、信息重组以及更现代的浏览和沉浸式阅读体验。
+**Gallery Lens** 为通过代理访问并解析 E-Hentai / ExHentai 内容，在保留源站搜索与图库能力的基础上，提供标签增强、信息重组以及更现代的浏览和沉浸式阅读体验，为用户提供更便捷的 E-Hentai 搜索与浏览体验。
 
 ## 功能
 
@@ -53,7 +53,9 @@ Gallery Lens 当前的搜索结果解析依赖源站的 **Extended** 展示模�
 
 请前往 E-Hentai / ExHentai 用户设置，将图库列表展示模式调整为 **Extended**。
 
-<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609290859512.png" alt="Extended 展示模式" style="zoom:50%;" />
+<img src="https://cdn.jsdelivr.net/gh/01Petard/imageURL@main/img/202609290859512.png" alt="Extended 展示模式" style="zoom:100%;" width="500" />
+
+
 
 ### 隐私模式
 
