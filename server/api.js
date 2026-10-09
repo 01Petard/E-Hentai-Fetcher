@@ -53,17 +53,17 @@ function sendJson(response, status, data) {
   response.end(body);
 }
 
-async function readJson(request) {
+async function readJson(request, limit = maxRequestBytes) {
   if (request.body !== undefined) {
     const body = JSON.stringify(request.body);
-    if (Buffer.byteLength(body) > maxRequestBytes) throw new Error('请求参数过长');
+    if (Buffer.byteLength(body) > limit) throw new Error('请求参数过长');
     return request.body;
   }
   const chunks = [];
   let length = 0;
   for await (const chunk of request) {
     length += chunk.length;
-    if (length > maxRequestBytes) throw new Error('请求参数过长');
+    if (length > limit) throw new Error('请求参数过长');
     chunks.push(chunk);
   }
   try {
@@ -370,7 +370,7 @@ async function route(request, response) {
       return;
     }
     if (request.method === 'PUT') {
-      const links = await readJson(request);
+      const links = await readJson(request, 1024 * 1024);
       if (!Array.isArray(links) || links.length > 500 || links.some(item => {
         if (typeof item?.label !== 'string' || !item.label.trim() || item.label.length > 200 || typeof item.url !== 'string' ||
             (item.sortOrder !== undefined && (!Number.isSafeInteger(item.sortOrder) || item.sortOrder < 1))) return true;

@@ -16,6 +16,7 @@ import {clearImmersiveProgress} from './lib/immersiveProgress.js';
 import {loadingStyleOptions, normalizeLoadingStyle} from './lib/loadingStyle.js';
 import {displayImageUrl, sourceHosts, sourceOrigin, sourceUrl} from './lib/sourceSite.js';
 import {privacyMode} from './lib/privacyMode.js';
+import {defaultPreferences, defaultSearchDisplay, preferencesKey, searchDisplayKey, normalizeConfiguration, readConfiguration, writeConfiguration} from './lib/configuration.js';
 
 const searchText = ref('');
 const quickLinks = ref([]);
@@ -23,7 +24,12 @@ const quickLinkDrafts = ref([]);
 const quickLinkError = ref('');
 const quickLinkMessage = ref('');
 const quickLinkImportInput = ref(null);
-const quickLinksExpanded = ref(false);
+const settingsView = ref('settings');
+const quickLinkManageButton = ref(null);
+const configurationInput = ref(null);
+const configurationBusy = ref(false);
+const configurationError = ref('');
+const configurationMessage = ref('');
 const settingsCategory = ref('connection');
 const settingsPanels = ref(null);
 const settingsSections = [
@@ -31,10 +37,11 @@ const settingsSections = [
   { key: 'search', label: '搜索与显示', scope: '首页搜索', icon: 'search', description: '管理标签显示、搜索联想和常用快捷导航。' },
   { key: 'gallery', label: '画廊浏览', scope: '详情与阅读窗', icon: 'image', description: '设置悬浮预览、阅读操作、浏览进度和图片预载入。' },
   { key: 'general', label: '系统设置', scope: '所有页面', icon: 'settings', description: '调整隐私保护和加载反馈。' },
-  { key: 'maintenance', label: '数据维护', scope: '本机配置', icon: 'reset', description: '管理标签数据库，或恢复默认配置。' },
+  { key: 'maintenance', label: '数据维护', scope: '本机配置', icon: 'reset', description: '迁移使用偏好、管理标签数据库，或恢复默认配置。' },
 ];
 const activeSettingsSection = computed(() => settingsSections.find(section => section.key === settingsCategory.value));
 const draggingQuickLink = ref(null);
+let quickLinksLoaded = Promise.resolve(true);
 let quickLinkDraftId = 0;
 let quickLinkDragPreview = null;
 let quickLinkDragStartY = 0;
@@ -45,18 +52,8 @@ const activeQuickLink = ref('');
 const quickLinksStorageKey = 'gallery-lens.quick-links';
 const serverQuickLinks = import.meta.env.VITE_SERVER_QUICK_LINKS === '1';
 const searchSessionKey = 'gallery-lens.search-session';
-const filters = reactive({
-  advanced: false,
-  f_sh: false,
-  f_sto: false,
-  f_spf: '',
-  f_spt: '',
-  f_srdd: '',
-  f_sfl: false,
-  f_sfu: false,
-  f_sft: false,
-});
-const view = ref('thumbnail');
+const filters = reactive({...defaultSearchDisplay.filters});
+const view = ref(defaultSearchDisplay.view);
 const loading = ref(true);
 const result = ref(null);
 const tagTranslations = shallowRef({});
@@ -68,8 +65,6 @@ const loadedUrl = ref('');
 let tagTextCache = new Map();
 const tagPopover = ref(null);
 const tagUpdate = reactive({ sha: '', checkedAt: 0, updatedAt: 0, busy: false, message: '', error: '' });
-const preferencesKey = 'gallery-lens.preferences';
-const defaultPreferences = { translateTags: true, tagDetails: true, tagSuggestions: true, relativeTime: true, autoUpdate: true, updateHours: 24, immersivePreload: true, immersivePreloadCount: 20, immersivePreloadBeforeCount: 10, immersiveSaveProgress: false, immersiveImageSnap: false, loadingStyle: 'spinner', useEx: false, privacyMode: false, useLowFidelityPreview: false };
 const preferences = reactive({...defaultPreferences, privacyMode: privacyMode.value});
 watch(() => preferences.privacyMode, value => { privacyMode.value = value; }, {flush: 'sync'});
 const immersiveCacheStats = ref(getImmersiveCacheStats());
@@ -386,6 +381,11 @@ function saveSearchSession() {
   } catch { /* Search remains usable when session storage is unavailable. */ }
 }
 
+watch([filters, view], () => {
+  if (!searchSessionReady) return;
+  try { localStorage.setItem(searchDisplayKey, JSON.stringify({view: view.value, filters: {...filters}})); } catch { /* Display settings remain usable for this session. */ }
+}, {deep: true});
+
 watch([searchText, filters, view, requestUrl, activeQuickLink, pageIndex, pageSize], saveSearchSession,
   { deep: true });
 
@@ -402,7 +402,7 @@ async function loadConfig() {
 
 function openSettings(view = 'settings') {
   settingsCategory.value = view === 'quick-links' ? 'search' : settingsSections[0].key;
-  quickLinksExpanded.value = view === 'quick-links';
+  settingsView.value = view === 'quick-links' ? 'quick-links' : 'settings';
   configError.value = '';
   configMessage.value = '';
   cookieDraft.value = '';
@@ -416,6 +416,19 @@ function openSettings(view = 'settings') {
     if ([0, 5, 10, 20].includes(Number(saved?.immersivePreloadBeforeCount))) preferences.immersivePreloadBeforeCount = Number(saved.immersivePreloadBeforeCount);
   } catch { /* Keep the current settings if storage is unavailable. */ }
   settingsDialog.value.showModal();
+}
+
+function openQuickLinksManagement() {
+  quickLinkError.value = '';
+  quickLinkMessage.value = '';
+  settingsView.value = 'quick-links';
+}
+
+async function returnToSettings() {
+  stopQuickLinkDrag();
+  settingsView.value = 'settings';
+  await nextTick();
+  quickLinkManageButton.value?.focus();
 }
 
 function closeSettingsOnBackdrop(event) {
@@ -555,6 +568,71 @@ function exportQuickLinks() {
   }
 }
 
+async function exportConfiguration() {
+  if (configurationBusy.value) return;
+  configurationBusy.value = true;
+  configurationError.value = '';
+  configurationMessage.value = '';
+  try {
+    if (!(await quickLinksLoaded)) throw new Error('快捷导航尚未加载，请刷新后重试。');
+    await nextTick();
+    const config = readConfiguration(localStorage, quickLinks.value, {view: view.value, filters: {...filters}});
+    const url = URL.createObjectURL(new Blob([JSON.stringify({...config, exportedAt: new Date().toISOString()}, null, 2)], {type: 'application/json'}));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'gallery-lens-configuration.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    configurationMessage.value = '配置已导出。';
+  } catch {
+    configurationError.value = '导出失败，请检查快捷导航连接、浏览器存储权限及已保存的配置。';
+  } finally {
+    configurationBusy.value = false;
+  }
+}
+
+async function importConfiguration(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file || configurationBusy.value) return;
+  configurationBusy.value = true;
+  configurationError.value = '';
+  configurationMessage.value = '';
+  try {
+    if (file.size > 1024 * 1024) throw new Error('配置文件不能超过 1 MB。');
+    let parsed;
+    try { parsed = JSON.parse(await file.text()); } catch { throw new Error('配置文件不是有效的 JSON。'); }
+    const config = normalizeConfiguration(parsed);
+    if (!(await quickLinksLoaded)) throw new Error('快捷导航尚未加载，请刷新后重试。');
+    // Validate and persist locally before changing reactive state or shared navigation.
+    const previous = readConfiguration(localStorage, quickLinks.value, {view: view.value, filters: {...filters}});
+    writeConfiguration(localStorage, config);
+    if (serverQuickLinks) {
+      try {
+        const response = await fetch('/api/quick-links', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(config.quickLinks)});
+        if (!response.ok) throw new Error('快捷导航保存失败，配置未导入。');
+      } catch (failure) {
+        writeConfiguration(localStorage, previous);
+        throw failure;
+      }
+    }
+    Object.assign(preferences, config.preferences);
+    quickLinks.value = config.quickLinks;
+    quickLinkDrafts.value = config.quickLinks.map(item => ({...item, dragId: ++quickLinkDraftId}));
+    view.value = config.search.view;
+    Object.assign(filters, config.search.filters);
+    quickLinkError.value = '';
+    quickLinkMessage.value = '';
+    configurationMessage.value = '配置已导入，画廊偏好将在下次打开画廊时生效。';
+  } catch (failure) {
+    configurationError.value = failure instanceof SyntaxError ? '已保存的配置无法读取。' : failure.message || '导入失败，请检查浏览器存储权限。';
+  } finally {
+    configurationBusy.value = false;
+  }
+}
+
 async function saveCookie() {
   if (!cookieDraft.value.trim()) {
     configError.value = '请输入 Cookie 请求头的值';
@@ -668,6 +746,8 @@ async function resetSettings() {
   }
   preferencesReady = false;
   Object.assign(preferences, defaultPreferences);
+  view.value = defaultSearchDisplay.view;
+  Object.assign(filters, defaultSearchDisplay.filters);
   quickLinks.value = [];
   quickLinkDrafts.value = [];
   quickLinkError.value = '';
@@ -676,7 +756,7 @@ async function resetSettings() {
   clearImmersiveCache();
   await nextTick();
   try {
-    for (const key of [preferencesKey, quickLinksStorageKey, 'gallery-lens.gallery-page-size', 'gallery-lens.gallery-columns', 'gallery-lens.comments-collapsed']) localStorage.removeItem(key);
+    for (const key of [preferencesKey, quickLinksStorageKey, 'gallery-lens.gallery-page-size', 'gallery-lens.gallery-columns', 'gallery-lens.comments-collapsed', searchDisplayKey]) localStorage.removeItem(key);
   } catch { /* The current page still uses the default settings. */ }
   preferencesReady = true;
   configMessage.value = '已恢复默认配置，并清除浏览器 Cookie 和已保存的浏览进度。';
@@ -811,6 +891,11 @@ function navigate(page) {
 }
 
 onMounted(async () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(searchDisplayKey));
+    if (['thumbnail', 'extended', 'minimal'].includes(saved?.view)) view.value = saved.view;
+    for (const key of Object.keys(filters)) if (typeof saved?.filters?.[key] === typeof filters[key]) filters[key] = saved.filters[key];
+  } catch { /* Keep default display settings when storage is unavailable. */ }
   const configRequest = loadConfig();
   const pageReload = isPageReload();
   if (pageReload) {
@@ -843,9 +928,13 @@ onMounted(async () => {
   window.addEventListener('pagehide', saveSearchSession);
   window.addEventListener('storage', onCacheScopeChange);
   if (serverQuickLinks) {
-    void fetch('/api/quick-links').then(response => response.json()).then(data => {
+    quickLinksLoaded = fetch('/api/quick-links').then(response => {
+      if (!response.ok) throw new Error('快捷导航加载失败');
+      return response.json();
+    }).then(data => {
       if (!disposed && Array.isArray(data.links)) quickLinks.value = normalizeQuickLinks(data.links, true);
-    }).catch(() => {});
+      return true;
+    }).catch(() => false);
   } else {
     try {
       const saved = JSON.parse(localStorage.getItem(quickLinksStorageKey));
@@ -1080,11 +1169,11 @@ onUnmounted(() => {
 
     <TorrentDialog ref="torrentDialog"/>
 
-    <dialog ref="settingsDialog" class="settings-dialog" aria-labelledby="settings-title" @click="closeSettingsOnBackdrop" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag()">
-      <div class="dialog-content"><div class="dialog-heading"><div><h2 id="settings-title">配置中心</h2><p class="settings-heading-description">站点连接、页面偏好与数据维护</p></div><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
-          <div class="settings-layout">
+    <dialog ref="settingsDialog" class="settings-dialog" :class="{ 'quick-links-dialog': settingsView === 'quick-links' }" aria-labelledby="settings-title" @click="closeSettingsOnBackdrop" @pointermove="dragQuickLink" @pointerup="stopQuickLinkDrag" @pointercancel="stopQuickLinkDrag" @close="stopQuickLinkDrag()">
+      <div class="dialog-content"><div class="dialog-heading"><div><h2 id="settings-title">{{ settingsView === 'quick-links' ? '快捷导航管理' : '配置中心' }}</h2><p class="settings-heading-description">{{ settingsView === 'quick-links' ? '编辑常用链接及顺序，保存后生效' : '站点连接、页面偏好与数据维护' }}</p></div><button type="button" class="close-button" aria-label="关闭配置" @click="settingsDialog.close()"><UiIcon name="x" :size="20" /></button></div>
+          <div v-show="settingsView === 'settings'" class="settings-layout">
             <nav class="settings-navigation" aria-label="配置分类">
-              <button v-for="section in settingsSections" :key="section.key" type="button" :aria-pressed="settingsCategory === section.key" @click="stopQuickLinkDrag(); stopQuickLinkDrag(); settingsCategory = section.key; if (settingsPanels) settingsPanels.scrollTop = 0">
+              <button v-for="section in settingsSections" :key="section.key" type="button" :aria-pressed="settingsCategory === section.key" @click="stopQuickLinkDrag(); settingsCategory = section.key; if (settingsPanels) settingsPanels.scrollTop = 0">
                 <UiIcon :name="section.icon" :size="18" /><span>{{ section.label }}</span><span v-if="section.key === 'connection'" class="settings-nav-status" :class="{ active: cookieConfigured }" :aria-label="cookieConfigured ? 'Cookie 已配置' : 'Cookie 未配置'"></span>
               </button>
             </nav>
@@ -1134,35 +1223,7 @@ onUnmounted(() => {
                   </div>
                 </div>
                 <section class="quick-link-settings" aria-label="快捷导航设置">
-                  <button class="quick-link-toggle" type="button" aria-label="快捷导航管理" aria-controls="quick-link-manager" :aria-expanded="quickLinksExpanded" @click="stopQuickLinkDrag(); quickLinksExpanded = !quickLinksExpanded">
-                    <span><strong>快捷导航</strong><span>已保存 {{ quickLinks.length }} 项</span></span>
-                    <UiIcon name="chevron-down" :size="18" />
-                  </button>
-                  <form v-show="quickLinksExpanded" id="quick-link-manager" class="quick-link-manager" @submit.prevent="saveQuickLinks">
-                    <div class="quick-link-toolbar">
-                      <div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div>
-                    </div>
-                    <p class="quick-link-manager-note">填写路径和查询参数，完整链接会自动去掉域名。访问时跟随 EX 模式切换站点。</p>
-                    <div class="quick-link-scroll">
-                      <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
-                        <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
-                          <div class="quick-link-row">
-                            <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置，上下方向键排序`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
-                            <input v-model="item.label" class="quick-link-name" type="text" :aria-label="`第 ${index + 1} 项名称`" :title="item.label" placeholder="名称" />
-                            <div class="quick-link-url"><span class="quick-link-base">{{ sourceOrigin(preferences.useEx) }}</span><input v-model="item.url" class="quick-link-address" type="text" :aria-label="`第 ${index + 1} 项地址`" :title="item.url" placeholder="/?f_search=AHY" /></div>
-                            <button class="quick-link-delete" type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
-                          </div>
-
-                        </div>
-                      </TransitionGroup>
-                      <p v-if="!quickLinkDrafts.length" class="quick-link-empty">暂无快捷导航，添加链接或导入 JSON 开始配置。</p>
-                    </div>
-                    <div class="quick-link-manager-footer">
-                      <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p>
-                      <div><span>{{ quickLinkDrafts.length }} 项 · 修改后需保存生效</span><button class="settings-action-button" type="submit">保存快捷链接</button></div>
-                    </div>
-                    <input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" />
-                  </form>
+                  <div class="quick-link-settings-summary"><div><h4>快捷导航</h4><p class="settings-detail-note">已保存 {{ quickLinks.length }} 项，管理常用的搜索与画廊链接。</p></div><button ref="quickLinkManageButton" class="settings-action-button" type="button" @click="openQuickLinksManagement">管理</button></div>
                 </section>
 
               </section>
@@ -1215,6 +1276,12 @@ onUnmounted(() => {
                 </div>
               </section>
               <section v-show="settingsCategory === 'maintenance'" class="settings-category" aria-label="数据维护设置">
+                <div class="settings-preference-group"><h4>配置迁移</h4>
+                  <p class="settings-detail-note">在多台电脑间恢复使用体验，包含配置中心偏好、已保存的快捷导航、搜索显示及画廊分页等设置。不包含 Cookie、缓存和浏览记录；导入将覆盖当前配置。</p>
+                  <div class="configuration-actions"><button class="settings-action-button" type="button" :disabled="configurationBusy || resettingSettings" @click="exportConfiguration">导出配置</button><button class="settings-action-button" type="button" :disabled="configurationBusy || resettingSettings" @click="configurationInput.click()">{{ configurationBusy ? '处理中…' : '导入配置' }}</button></div>
+                  <input ref="configurationInput" class="sr-only" tabindex="-1" type="file" accept=".json,application/json" aria-label="选择配置文件" @change="importConfiguration" />
+                  <p v-if="configurationError" class="form-error" role="alert">{{ configurationError }}</p><p v-else-if="configurationMessage" class="settings-message" role="status">{{ configurationMessage }}</p>
+                </div>
                 <div class="settings-preference-group settings-tag-maintenance">          <h4>标签数据库</h4>
           <p>本机缓存标签译名与介绍；自动更新在页面打开期间按设置的间隔检查。</p>
           <div class="tag-update-controls"><label><input v-model="preferences.autoUpdate" type="checkbox" /> 自动更新</label><label for="tag-update-interval">检查间隔</label><select id="tag-update-interval" v-model.number="preferences.updateHours" :disabled="!preferences.autoUpdate"><option :value="6">6 小时</option><option :value="24">24 小时</option><option :value="168">7 天</option></select></div>
@@ -1226,11 +1293,37 @@ onUnmounted(() => {
           </div>
           <p v-if="tagUpdate.error" class="form-error" role="alert">{{ tagUpdate.error }}{{ tagUpdate.sha ? '；已缓存的标签仍可使用。' : '；请稍后重试。' }}</p><p v-else-if="tagUpdate.message" class="tag-update-message" role="status">{{ tagUpdate.message }}</p>
 </div>
-                <div class="settings-preference-group settings-danger-zone"><h4>恢复默认配置</h4>        <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie" @click="requestSettingsReset">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div><p v-if="resetMessage" class="settings-message" role="status">{{ resetMessage }}</p></div>
+                <div class="settings-preference-group settings-danger-zone"><h4>恢复默认配置</h4>        <div class="settings-reset"><button class="settings-action-button" type="button" :disabled="resettingSettings || clearingCookie || savingCookie || configurationBusy" @click="requestSettingsReset">{{ resettingSettings ? '恢复中…' : '恢复默认配置' }}</button><span>同时清除浏览器 Cookie、快捷链接及已保存的画廊进度。</span></div><p v-if="resetMessage" class="settings-message" role="status">{{ resetMessage }}</p></div>
               </section>
             </div>
           </div>
-          <div class="settings-save-note"><UiIcon name="check" :size="15" /><span>偏好设置自动保存，Cookie 与快捷导航需单独保存。</span></div>
+          <form v-if="settingsView === 'quick-links'" id="quick-link-manager" class="quick-link-manager" @submit.prevent="saveQuickLinks">
+            <div class="quick-link-toolbar">
+              <div><button class="settings-action-button" type="button" @click="addQuickLink">添加链接</button><button class="settings-action-button" type="button" @click="quickLinkImportInput.click()">导入 JSON</button><button class="settings-action-button" type="button" @click="exportQuickLinks">导出 JSON</button></div>
+            </div>
+            <p class="quick-link-manager-note">填写路径和查询参数，完整链接会自动去掉域名。访问时跟随 EX 模式切换站点。</p>
+            <div class="quick-link-scroll">
+              <TransitionGroup name="quick-link" tag="div" class="quick-link-items">
+                <div v-for="(item, index) in quickLinkDrafts" :key="item.dragId" class="quick-link-editor" :class="{ 'is-dragging': draggingQuickLink === item }" :data-index="index">
+                  <div class="quick-link-row">
+                    <button class="quick-link-drag" type="button" :aria-label="`调整第 ${index + 1} 项位置，上下方向键排序`" title="按住拖动调整顺序" @pointerdown.prevent="startQuickLinkDrag($event, index)" @keydown.up.prevent="moveQuickLink(index, index - 1)" @keydown.down.prevent="moveQuickLink(index, index + 1)"><UiIcon name="list" :size="16" /></button>
+                    <input v-model="item.label" class="quick-link-name" type="text" :aria-label="`第 ${index + 1} 项名称`" :title="item.label" placeholder="名称" />
+                    <div class="quick-link-url"><span class="quick-link-base">{{ sourceOrigin(preferences.useEx) }}</span><input v-model="item.url" class="quick-link-address" type="text" :aria-label="`第 ${index + 1} 项地址`" :title="item.url" placeholder="/?f_search=AHY" /></div>
+                    <button class="quick-link-delete" type="button" :aria-label="`删除第 ${index + 1} 项`" @click="quickLinkDrafts.splice(index, 1)"><UiIcon name="x" :size="16" /></button>
+                  </div>
+
+                </div>
+              </TransitionGroup>
+              <p v-if="!quickLinkDrafts.length" class="quick-link-empty">暂无快捷导航，添加链接或导入 JSON 开始配置。</p>
+            </div>
+            <div class="quick-link-manager-footer">
+              <p v-if="quickLinkError" class="form-error" role="alert">{{ quickLinkError }}</p><p v-else-if="quickLinkMessage" class="settings-message" role="status">{{ quickLinkMessage }}</p>
+              <div><span>{{ quickLinkDrafts.length }} 项 · 修改后需保存生效</span><button class="settings-action-button" type="submit">保存快捷链接</button></div>
+            </div>
+            <input ref="quickLinkImportInput" class="sr-only" type="file" accept=".json,application/json" aria-label="选择快捷链接 JSON 文件" @change="importQuickLinks" />
+          </form>
+          <div v-if="settingsView === 'quick-links'" class="quick-links-return"><button class="settings-action-button" type="button" @click="returnToSettings">返回配置中心</button></div>
+          <div v-show="settingsView === 'settings'" class="settings-save-note"><UiIcon name="check" :size="15" /><span>偏好设置自动保存，Cookie 与快捷导航需单独保存。</span></div>
 
       </div>
     </dialog>

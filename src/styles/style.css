@@ -1776,14 +1776,6 @@ a {
 .quick-link-settings > p, .cookie-settings > p { margin: 7px 0 14px; color: #607565; font-size: 12px; line-height: 1.5; }
 .quick-link-settings { margin-top: 20px; }
 .quick-link-items { position: relative; }
-.quick-link-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 52px; padding: 4px 0; border: 0; background: none; color: #2d4537; font: inherit; text-align: left; cursor: pointer; }
-.quick-link-toggle > span { display: grid; gap: 6px; }
-.quick-link-toggle strong { font-size: 14px; }
-.quick-link-toggle > span > span { color: #536858; font-size: 12px; }
-.quick-link-toggle > svg { flex: none; }
-.quick-link-toggle[aria-expanded="true"] > svg { transform: rotate(180deg); }
-.quick-link-toggle:hover { color: #2f6d4b; }
-.quick-link-toggle:focus-visible { outline: 2px solid #4d9f78; outline-offset: 4px; border-radius: 4px; }
 .quick-link-manager { display: flex; flex-direction: column; margin-top: 16px; }
 .quick-link-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; flex: none; }
 .quick-link-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -2628,4 +2620,17 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
     .search-skeleton.minimal .gallery-item > .search-placeholder-chip:nth-child(3) { display: none }
     .search-skeleton.minimal .minimal-content { grid-column: 2; grid-row: 1 }
     .search-skeleton.minimal .gallery-item > .search-placeholder-chip:last-child { grid-column: 3; grid-row: 1 }
+}
+
+.configuration-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+.quick-link-settings-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.quick-link-settings-summary h4 { margin: 0; }
+.quick-link-settings-summary .settings-detail-note { margin: 7px 0 0; }
+.quick-links-dialog .quick-link-manager { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; padding: 20px 24px 0; }
+.quick-links-dialog .quick-link-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.quick-links-return { flex: none; padding: 14px 24px 20px; }
+@media (max-width: 560px) {
+  .quick-links-dialog .quick-link-manager { padding: 16px 18px 0; }
+  .quick-links-return { padding: 14px 18px 18px; }
 }
