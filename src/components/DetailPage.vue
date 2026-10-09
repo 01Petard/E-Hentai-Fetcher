@@ -356,8 +356,8 @@ onUnmounted(() => {
 
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
-    <header class="site-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
-      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
+    <header class="site-header source-navigation-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
+      <nav class="header-actions" aria-label="页面导航"><a href="/"><UiIcon name="home" :size="15"/> 主页</a><a :href="sourceUrl('/uconfig.php')" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15"/> 个人设置</a><a :href="sourceUrl('/')" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15"/> 返回源站</a><a href="/debug"><UiIcon name="terminal" :size="15"/> 调试控制台</a><a class="settings-trigger" href="/?settings=1"><UiIcon name="settings" :size="16"/> 配置 <span class="settings-dot" :class="{active: cookieConfigured}"></span></a></nav>
     </header>
     <main class="detail-main">
       <div v-if="kind === 'image' && loading" class="detail-state" role="status"><LoadingIndicator :variant="loadingStyle"/>

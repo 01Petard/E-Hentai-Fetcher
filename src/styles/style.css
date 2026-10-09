@@ -2634,3 +2634,8 @@ button.tag:hover { background: #dfe9df; color: #2b5d3e; }
   .quick-links-dialog .quick-link-manager { padding: 16px 18px 0; }
   .quick-links-return { padding: 14px 18px 18px; }
 }
+
+@media (max-width: 760px) {
+    .source-navigation-header { height: auto; min-height: 56px; flex-wrap: wrap; padding-block: 10px; }
+    .source-navigation-header .header-actions { flex-basis: 100%; justify-content: space-between; }
+}

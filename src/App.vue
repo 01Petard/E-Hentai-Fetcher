@@ -1004,13 +1004,15 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
-    <header class="site-header">
+    <header class="site-header source-navigation-header">
       <a class="brand" :href="siteHomeUrl" aria-label="Gallery Lens，访问站点首页" @click="handleHomeClick">
         <span class="brand-mark">E<span>·</span></span>
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
         <a :href="siteHomeUrl" @click="handleHomeClick"><UiIcon name="home" :size="15" /> 主页</a>
+        <a :href="`${sourceOrigin(preferences.useEx)}/uconfig.php`" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15" /> 个人设置</a>
+        <a :href="siteHomeUrl" target="_blank" rel="noopener noreferrer"><UiIcon name="external" :size="15" /> 返回源站</a>
         <a href="/debug"><UiIcon name="terminal" :size="15" /> 调试控制台</a>
         <button type="button" class="settings-trigger" @click="openSettings"><UiIcon name="settings" :size="16" /> 配置 <span class="settings-dot" :class="{ active: cookieConfigured }"></span></button>
       </nav>
