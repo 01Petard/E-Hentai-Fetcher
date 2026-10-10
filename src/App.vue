@@ -599,7 +599,7 @@ async function exportConfiguration() {
     const url = URL.createObjectURL(new Blob([JSON.stringify({...config, exportedAt: new Date().toISOString()}, null, 2)], {type: 'application/json'}));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'gallery-lens-configuration.json';
+    anchor.download = 'system-config.json';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -797,7 +797,7 @@ const searchLoader = browserSearchResultsLoader(async target => {
     throw failure;
   }
   const parsed = parseGallery(html, target);
-  if (!parsed.hasTable) {
+  if (!parsed.hasTable && !parsed.noResults) {
     const failure = new Error('响应中没有 Extended 结果表格，可在下方查看原始 HTML。');
     failure.rawResponse = html;
     throw failure;
@@ -817,7 +817,7 @@ async function runSearch(url, targetIndex = null, options = {}) {
     error.value = target ? '请先在配置菜单中保存 Cookie。' : '请求地址无效';
     return;
   }
-  if (loadedUrl.value && new URL(loadedUrl.value).hostname !== new URL(target).hostname) result.value = null;
+  result.value = null;
   loading.value = true;
   try {
     const {result: parsed} = await searchLoader.load(target, options);

@@ -19,7 +19,7 @@ export function createSearchResultsLoader({fetchPage, storage, scope, now = Date
       const saved = JSON.parse(storage?.getItem(storageKey) || 'null');
       if (saved?.scope === next && Array.isArray(saved.pages)) {
         for (const [url, entry] of saved.pages.slice(-maxPages)) {
-          if (entry?.expiresAt > now() && entry.data?.hasTable && Array.isArray(entry.data.items)) pages.set(url, entry);
+          if (entry?.expiresAt > now() && (entry.data?.hasTable || entry.data?.noResults) && Array.isArray(entry.data.items)) pages.set(url, entry);
         }
       }
     } catch { /* Search still works without persistent caching. */ }

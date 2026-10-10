@@ -52,7 +52,11 @@ export function parseGallery(html, requestUrl) {
     pages[key] = safeUrl(anchor?.getAttribute('href'), sourceHosts, requestUrl);
   }
   const table = document.querySelector('table.itg.glte');
-  if (!table) return { items: [], total, approximate, pages, hasTable: false };
+  if (!table) {
+    const noResults = [...document.querySelectorAll('.ido > div > p')]
+      .some(node => /^No hits found$/i.test(node.textContent.trim()));
+    return { items: [], total: noResults ? 0 : total, approximate: noResults ? false : approximate, pages, hasTable: false, noResults };
+  }
 
   const items = [];
   for (const row of table.rows) {

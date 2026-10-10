@@ -94,6 +94,15 @@ test('disabled storage does not prevent cache hits or normal searching', async (
   assert.equal(calls.length, 1);
 });
 
+test('empty search results survive persisted cache restoration without a result table', async () => {
+  const empty = {hasTable: false, noResults: true, items: [], pages: {}, total: 0, approximate: false};
+  const first = setup({fetchPage: () => empty});
+  assert.deepEqual((await first.loader.load(url)).result, empty);
+  const restored = setup({storage: first.storage});
+  assert.deepEqual((await restored.loader.load(url)).result, empty);
+  assert.equal(restored.calls.length, 0);
+});
+
 test('translation indexing yields before processing and between batches, retaining lookup semantics', async () => {
   const translations = Object.fromEntries(Array.from({length: 450}, (_, i) => [`F:TAG${i}`, `中文${i}`]));
   let processed = 0;

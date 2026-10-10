@@ -12,9 +12,10 @@
     "immersivePreloadCount": 20,
     "immersivePreloadBeforeCount": 10,
     "immersiveSaveProgress": false,
-    "immersiveImageSnap": false,
+    "immersiveImageSnap": true,
     "loadingStyle": "progress",
     "theme": "system",
+    "palette": "rainbow",
     "useEx": false,
     "privacyMode": false,
     "useLowFidelityPreview": false
@@ -93,7 +94,7 @@
   ],
   "gallery": {
     "pageSize": 100,
-    "columns": 6,
+    "columns": 7,
     "commentsCollapsed": false
   },
   "search": {
@@ -110,5 +111,5 @@
       "f_sft": false
     }
   },
-  "exportedAt": "2026-10-09T02:15:41.415Z"
+  "exportedAt": "2026-10-10T12:02:16.109Z"
 }
