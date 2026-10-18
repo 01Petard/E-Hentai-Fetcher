@@ -15,7 +15,7 @@
     "immersiveImageSnap": true,
     "loadingStyle": "progress",
     "theme": "system",
-    "palette": "rainbow",
+    "palette": "gray",
     "useEx": false,
     "privacyMode": false,
     "useLowFidelityPreview": false
@@ -111,5 +111,5 @@
       "f_sft": false
     }
   },
-  "exportedAt": "2026-10-10T12:02:16.109Z"
+  "exportedAt": "2026-10-17T07:34:21.168Z"
 }
