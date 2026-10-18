@@ -15,7 +15,11 @@
     <a href="#本地运行">本地运行</a> ·
     <a href="#部署与更新">部署</a>
   </p>
-  <p><a href="https://e-gallery.bugstack.top">在线访问</a> · <a href="https://github.com/01Petard/E-Hentai-Fetcher">GitHub</a></p>
+  <p>
+    <a href="https://e-gallery.bugstack.top">在线访问</a> ·
+    <a href="https://github.com/01Petard/E-Hentai-Fetcher">GitHub</a> ·
+    <a href="https://github.com/01Petard/E-Hentai-Bridger">配套扩展</a>
+  </p>
 </div>
 
 Gallery Lens 与 E-Hentai / ExHentai 官方无关，不托管图库内容。源站继续提供内容并决定账号的访问权限，本项目负责代理请求、解析与浏览交互。
