@@ -511,12 +511,10 @@
 :root[data-palette="rainbow"] .site-header {
     background: var(--rainbow-spectrum) bottom / 100% 3px no-repeat, var(--surface);
 }
-:root[data-palette="rainbow"] .brand-mark,
 :root[data-palette="rainbow"] .search-actions .primary-button {
     background: var(--rainbow-spectrum);
     color: var(--rainbow-ink);
 }
-:root[data-palette="rainbow"] .brand-mark span { color: var(--rainbow-ink); }
 :root[data-palette="rainbow"] .search-actions .primary-button:hover:not(:disabled) {
     background: var(--rainbow-spectrum);
     filter: brightness(1.06);

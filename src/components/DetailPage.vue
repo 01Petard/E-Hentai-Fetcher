@@ -356,7 +356,7 @@ onUnmounted(() => {
 
 <template>
   <div class="detail-shell" :class="{'gallery-page': kind === 'gallery'}">
-    <header class="site-header source-navigation-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><span class="brand-mark">E<span>·</span></span><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
+    <header class="site-header source-navigation-header"><a class="brand" href="/" aria-label="Gallery Lens，返回主页"><img class="brand-mark" src="/favicon.svg" width="40" height="40" alt="" /><div><strong>Gallery Lens</strong><small>在线图库检索</small></div></a>
       <nav class="header-actions" aria-label="页面导航">
         <a href="/"><UiIcon name="home" :size="15"/> 主页</a>
         <a :href="sourceUrl('/uconfig.php')" target="_blank" rel="noopener noreferrer"><UiIcon name="settings" :size="15"/> 个人设置</a>

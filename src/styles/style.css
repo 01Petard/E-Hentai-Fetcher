@@ -67,20 +67,11 @@ a {
 }
 
 .brand-mark {
+    display: block;
+    flex: none;
     width: 40px;
     height: 40px;
-    border-radius: 11px;
-    background: var(--brand-bg);
-    color: var(--brand-text);
-    font-family: Georgia, serif;
-    font-size: 25px;
-    display: grid;
-    place-items: center;
-    line-height: 1
-}
-
-.brand-mark span {
-    color: var(--brand-warm)
+    object-fit: contain
 }
 
 .brand strong {
@@ -915,8 +906,7 @@ main {
 
     .brand-mark {
         width: 35px;
-        height: 35px;
-        font-size: 21px
+        height: 35px
     }
 
     .brand strong {
@@ -1093,19 +1083,6 @@ main {
 
 .site-header {
     box-shadow: 0 1px 0 var(--header-shadow, #ffffffa8);
-}
-
-.brand-mark {
-    position: relative;
-    letter-spacing: -.09em;
-    padding-right: 3px;
-}
-
-.brand-mark span {
-    position: absolute;
-    right: 8px;
-    bottom: 5px;
-    font-size: 19px;
 }
 
 .header-actions a {

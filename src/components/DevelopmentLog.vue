@@ -19,7 +19,7 @@ const groupedUpdates = computed(() => {
   <div class="app-shell">
     <header class="site-header">
       <a class="brand log-brand" href="/" aria-label="Gallery Lens 首页">
-        <span class="brand-mark">E<span>·</span></span>
+        <img class="brand-mark" src="/favicon.svg" width="40" height="40" alt="" />
         <span><strong>Gallery Lens</strong><small>在线图库检索</small></span>
       </a>
       <nav class="header-actions" aria-label="页面导航"><a href="/">返回首页</a></nav>

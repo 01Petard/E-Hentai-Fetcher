@@ -1026,7 +1026,7 @@ onUnmounted(() => {
   <div class="app-shell">
     <header class="site-header source-navigation-header">
       <a class="brand" :href="siteHomeUrl" aria-label="Gallery Lens，访问站点首页" @click="handleHomeClick">
-        <span class="brand-mark">E<span>·</span></span>
+        <img class="brand-mark" src="/favicon.svg" width="40" height="40" alt="" />
         <div><strong>Gallery Lens</strong><small>在线图库检索</small></div>
       </a>
       <nav class="header-actions" aria-label="页面导航">
