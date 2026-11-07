@@ -3,7 +3,6 @@ import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
 import {privacyMode} from '../lib/privacyMode.js';
 import {parseImageDetail} from '../lib/parseDetails.js';
 import {displayImageUrl} from '../lib/sourceSite.js';
-import LoadingIndicator from './LoadingIndicator.vue';
 
 const props = defineProps({fetchSource: {type: Function, required: true}, loadingStyle: {type: String, required: true}});
 const preview = ref(null);
@@ -57,13 +56,13 @@ function open(item, event) {
   try {
     useLowFidelity = JSON.parse(localStorage.getItem('gallery-lens.preferences'))?.useLowFidelityPreview === true;
   } catch { /* Keep the fast thumbnail preview when storage is unavailable. */ }
-  preview.value = {item, rect, useLowFidelity, detail: null, src: '', status: 'loading', revealed: !privacyMode.value};
+  preview.value = {item, rect, useLowFidelity, detail: null, pendingDetail: null, src: '', status: 'loading', revealed: !privacyMode.value};
   if (privacyMode.value && event.type !== 'focus') {
     revealTimer = setTimeout(() => {
       if (current === version && preview.value) preview.value.revealed = true;
     }, 500);
   }
-  // Thumbnail mode reuses the loaded sprite immediately; only the clearer mode requests a single-image page.
+  // Keep the loaded thumbnail visible while the clearer image loads.
   if (!useLowFidelity) return;
   timer = setTimeout(async () => {
     const request = new AbortController();
@@ -77,7 +76,7 @@ function open(item, event) {
         cache.set(item.url, detail);
       }
       if (current !== version) return;
-      preview.value = {...preview.value, detail, src: displayImageUrl(detail.image)};
+      preview.value = {...preview.value, pendingDetail: detail, src: displayImageUrl(detail.image)};
     } catch {
       if (current === version) preview.value.status = 'error';
     } finally {
@@ -87,7 +86,8 @@ function open(item, event) {
 }
 
 function imageLoaded(src) {
-  if (preview.value?.src === src) preview.value.status = 'ready';
+  if (preview.value?.src !== src) return;
+  preview.value = {...preview.value, detail: preview.value.pendingDetail, status: 'ready'};
 }
 
 function imageFailed(src) {
@@ -126,14 +126,12 @@ defineExpose({open, close});
   <Teleport to="body">
     <aside v-if="preview" class="catalog-image-preview" :style="previewStyle" aria-label="单图预览">
       <div class="catalog-preview-image">
-        <div v-if="!preview.useLowFidelity" class="catalog-preview-sprite detail-sprite" :style="{ width: preview.item.width, height: preview.item.height, backgroundImage: `url('${preview.item.sprite}')`, backgroundPosition: preview.item.position }" role="img" :aria-label="`第 ${preview.item.number} 张图片预览`" :data-privacy-revealed="preview.revealed || undefined"></div>
-        <template v-else>
+        <div v-if="!preview.useLowFidelity || preview.status !== 'ready'" class="catalog-preview-sprite detail-sprite" :style="{ width: preview.item.width, height: preview.item.height, backgroundImage: `url('${preview.item.sprite}')`, backgroundPosition: preview.item.position }" role="img" :aria-label="`第 ${preview.item.number} 张图片预览`" :data-privacy-revealed="preview.revealed || undefined"></div>
+        <template v-if="preview.useLowFidelity">
           <img v-if="preview.src && preview.status !== 'error'" :key="preview.src" :src="preview.src" :alt="`第 ${preview.item.number} 张图片预览`" :class="{'is-ready': preview.status === 'ready'}" :data-privacy-revealed="preview.revealed || undefined" referrerpolicy="no-referrer" @load="imageLoaded($event.target.getAttribute('src'))" @error="imageFailed($event.target.getAttribute('src'))"/>
-          <div v-if="preview.status === 'loading'" class="catalog-preview-state" role="status"><LoadingIndicator :variant="loadingStyle"/><span>正在加载预览…</span></div>
-          <div v-else-if="preview.status === 'error'" class="catalog-preview-state" role="status"><strong>暂时无法预览</strong><span>点击缩略图查看单图</span></div>
         </template>
       </div>
-      <div class="catalog-preview-caption"><strong>第 {{ preview.item.number }} 张</strong><span>{{ preview.useLowFidelity ? '低保真预览' : '缩略图放大' }}</span></div>
+      <div class="catalog-preview-caption"><strong>第 {{ preview.item.number }} 张</strong><span>{{ preview.useLowFidelity && preview.status === 'ready' ? '低保真预览' : '缩略图放大' }}</span></div>
     </aside>
   </Teleport>
 </template>
